@@ -1,4 +1,4 @@
-// File: D:\Nexus 1\Bed\Nexus-Bed-Management- - Copy\app\(dashboard)\ipd\add-room-type\page.tsx
+// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\ipd\add-room-type\page.tsx
 import * as entry from '../../../../../../app/(dashboard)/ipd/add-room-type/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

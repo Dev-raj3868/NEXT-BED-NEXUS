@@ -18,53 +18,30 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { Loader2 } from "lucide-react";
 
-const mockBeds = [
-  {
-    roomId: "101",
-    bedNumber: "101-A",
-    position: "Left",
-    status: "Occupied",
-    currentPatient: "John Doe",
-  },
-  {
-    roomId: "101",
-    bedNumber: "101-B",
-    position: "Right",
-    status: "Available",
-    currentPatient: null,
-  },
-  {
-    roomId: "201",
-    bedNumber: "201-A",
-    position: "Left",
-    status: "Occupied",
-    currentPatient: "Jane Smith",
-  },
-  {
-    roomId: "201",
-    bedNumber: "201-B",
-    position: "Right",
-    status: "Maintenance",
-    currentPatient: null,
-  },
-  {
-    roomId: "ICU-01",
-    bedNumber: "ICU-01-A",
-    position: "Center",
-    status: "Occupied",
-    currentPatient: "Robert Brown",
-  },
-];
+// Updated Interface to match your nested response
+interface Bed {
+  _id: string;
+  room_id: {
+    _id: string;
+    department_name: string;
+    room_category: string;
+    room_number: string;
+  };
+  bed_number: string;
+  status: string;
+}
 
 const getStatusVariant = (status: string) => {
-  switch (status) {
-    case "Available":
+  switch (status?.toUpperCase()) {
+    case "AVAILABLE":
       return "default";
-    case "Occupied":
+    case "OCCUPIED":
       return "secondary";
-    case "Maintenance":
+    case "MAINTENANCE":
       return "destructive";
     default:
       return "outline";
@@ -72,7 +49,39 @@ const getStatusVariant = (status: string) => {
 };
 
 const GetBed = () => {
+  const [beds, setBeds] = useState<Bed[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const fetchBeds = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_beds`,
+        { clinic_id: "clinic123" },
+        { withCredentials: true }
+      );
+
+      console.log("Fetched Beds Response:", response.data);
+
+      // Map the data correctly from the response
+      if (response.data.resSuccess === 1) {
+        setBeds(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching beds:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBeds();
+  }, []);
+
+  const totalPages = Math.ceil(beds.length / itemsPerPage);
+  const currentBeds = beds.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="space-y-6">
@@ -86,54 +95,79 @@ const GetBed = () => {
           <CardTitle>Bed List</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Room ID</TableHead>
-                <TableHead>Bed Number</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Current Patient</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockBeds.map((bed, index) => (
-                <TableRow key={index}>
-                  <TableCell>{bed.roomId}</TableCell>
-                  <TableCell className="font-medium">{bed.bedNumber}</TableCell>
-                  <TableCell>{bed.position}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(bed.status)}>
-                      {bed.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{bed.currentPatient || "-"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Room No.</TableHead>
+                      <TableHead>Dept.</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Bed No.</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentBeds.length > 0 ? (
+                      currentBeds.map((bed) => (
+                        <TableRow key={bed._id}>
+                          {/* Accessing nested room_id data */}
+                          <TableCell className="font-medium">
+                            {bed.room_id?.room_number || "N/A"}
+                          </TableCell>
+                          <TableCell>{bed.room_id?.department_name}</TableCell>
+                          <TableCell className="capitalize text-xs">
+                            {bed.room_id?.room_category?.replace(/-/g, ' ')}
+                          </TableCell>
+                          <TableCell className="font-bold">{bed.bed_number}</TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusVariant(bed.status)}>
+                              {bed.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-10">
+                          No beds found.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    href="#" 
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationLink href="#" isActive>1</PaginationLink>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext 
-                    href="#" 
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+              {beds.length > itemsPerPage && (
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} 
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationLink href="#" isActive>{currentPage}</PaginationLink>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(p => p + 1); }} 
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

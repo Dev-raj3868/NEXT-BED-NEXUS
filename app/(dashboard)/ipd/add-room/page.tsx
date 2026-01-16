@@ -1,4 +1,5 @@
 'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,34 +12,127 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
+import { Loader2 } from "lucide-react";
 
 const AddRoom = () => {
   const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const mockDeps = [
+
+    { _id: "695bb7de67fbc7ab32baacdf", name: "ICU" },
+    { _id: "695bb7de67fbc7ab32baacde", name: "Cardiology" },
+  ];
+  
+  const [floors, setFloors] = useState<{ _id: string; floor_name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>(mockDeps);
+
   const [formData, setFormData] = useState({
     floorId: "",
-    department: "",
+    departmentId: "",
     roomCategory: "",
     roomNumber: "",
     ratePerDay: "",
     amenities: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch floors on mount to populate the dropdown
+  useEffect(() => {
+    const fetchFloors = async () => {
+      try {
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, {
+          clinic_id: "clinic123",
+        }, {
+          withCredentials: true
+        });
+        if (response.data.resSuccess === 1) {
+          setFloors(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching floors:", error);
+      }
+    };
+    const fetchDepartments = async () => {
+      try {
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, {
+          clinic_id: "clinic001",
+        }, {
+          withCredentials: true
+        });
+        console.log("Departments Response:", response.data);
+        if (response.data.resSuccess === 1) {
+          setDepartments(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+    fetchFloors();
+    fetchDepartments();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Room Added",
-      description: `Room "${formData.roomNumber}" has been added successfully.`,
-    });
-    setFormData({
-      floorId: "",
-      department: "",
-      roomCategory: "",
-      roomNumber: "",
-      ratePerDay: "",
-      amenities: "",
-    });
+    setLoading(true);
+
+    const selectedDept = departments.find(d => d._id === formData.departmentId);
+
+    const payload = {
+      floor_id: formData.floorId,
+      room_category: formData.roomCategory,
+      department_id: formData.departmentId,
+      department_name: selectedDept?.name || "",
+      room_number: formData.roomNumber,
+      rate_per_day: Number(formData.ratePerDay),
+      amenities: formData.amenities.split(",").map(item => item.trim()).filter(item => item !== ""),
+      clinic_id: "clinic123",
+    };
+
+    console.log("Submitting Room Data:", payload);
+
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/add_rooms`,
+        payload,
+        { withCredentials: true }
+      );
+
+      console.log("Server Response:", response.data);
+
+      if (response.data.resSuccess === 1) {
+        toast({
+          title: "Room Added",
+          description: `Room "${formData.roomNumber}" has been added successfully.`,
+        });
+        
+        // Reset form
+        setFormData({
+          floorId: "",
+          departmentId: "",
+          roomCategory: "",
+          roomNumber: "",
+          ratePerDay: "",
+          amenities: "",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response.data.message || "Failed to add room",
+        });
+      }
+    } catch (error) {
+      console.error("Submission Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Could not reach the server.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -65,9 +159,11 @@ const AddRoom = () => {
                     <SelectValue placeholder="Select floor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FL001">Ground Floor</SelectItem>
-                    <SelectItem value="FL002">First Floor</SelectItem>
-                    <SelectItem value="FL003">Second Floor</SelectItem>
+                    {floors.map((floor) => (
+                      <SelectItem key={floor._id} value={floor._id}>
+                        {floor.floor_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -75,17 +171,21 @@ const AddRoom = () => {
               <div className="space-y-2">
                 <Label htmlFor="department">Department</Label>
                 <Select
-                  value={formData.department}
-                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  value={formData.departmentId}
+                  onValueChange={(value) => {
+                    console.log("Selected Department ID:", value);
+                    setFormData({ ...formData, departmentId: value })
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiology">Cardiology</SelectItem>
-                    <SelectItem value="neurology">Neurology</SelectItem>
-                    <SelectItem value="orthopedics">Orthopedics</SelectItem>
-                    <SelectItem value="general">General Medicine</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept._id} value={dept._id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -100,9 +200,9 @@ const AddRoom = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">General Ward</SelectItem>
+                    <SelectItem value="general-ward">General Ward</SelectItem>
                     <SelectItem value="semi-private">Semi-Private</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
+                    <SelectItem value="private-bed-1">Private Bed</SelectItem>
                     <SelectItem value="icu">ICU</SelectItem>
                   </SelectContent>
                 </Select>
@@ -112,7 +212,7 @@ const AddRoom = () => {
                 <Label htmlFor="roomNumber">Room Number</Label>
                 <Input
                   id="roomNumber"
-                  placeholder="Enter room number"
+                  placeholder="e.g. A1"
                   value={formData.roomNumber}
                   onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
                   required
@@ -124,7 +224,7 @@ const AddRoom = () => {
                 <Input
                   id="ratePerDay"
                   type="number"
-                  placeholder="Enter rate per day"
+                  placeholder="2000"
                   value={formData.ratePerDay}
                   onChange={(e) => setFormData({ ...formData, ratePerDay: e.target.value })}
                   required
@@ -136,14 +236,16 @@ const AddRoom = () => {
               <Label htmlFor="amenities">Amenities</Label>
               <Textarea
                 id="amenities"
-                placeholder="Enter amenities (comma separated)"
+                placeholder="AC, TV, Refrigerator"
                 value={formData.amenities}
                 onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">Separate items with commas</p>
             </div>
 
-            <Button type="submit" className="w-full">
-              Add Room
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Adding..." : "Add Room"}
             </Button>
           </form>
         </CardContent>

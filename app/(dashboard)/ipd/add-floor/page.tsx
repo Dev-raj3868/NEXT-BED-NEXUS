@@ -5,18 +5,33 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
 
 const AddFloor = () => {
   const { toast } = useToast();
   const [floorName, setFloorName] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Floor Added",
-      description: `Floor "${floorName}" has been added successfully.`,
-    });
-    setFloorName("");
+    try {
+      console.log("ADding new floor:", floorName);
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/add_floors`, {
+        floor_name: floorName,
+        clinic_id: "clinic123",
+      }, {
+        withCredentials: true
+      });
+      console.log("Floor added successfully:", response.data);
+      if(response.data.resSuccess === 1) {
+        toast({
+          title: "Floor Added",
+          description: `Floor "${floorName}" has been added successfully.`,
+        });
+        setFloorName("");
+      }
+    } catch (error) {
+      console.error("Error adding floor:", error);
+    }
   };
 
   return (

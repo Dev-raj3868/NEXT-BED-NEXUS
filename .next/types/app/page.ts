@@ -1,4 +1,4 @@
-// File: D:\Nexus 1\Bed\Nexus-Bed-Management- - Copy\app\page.tsx
+// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

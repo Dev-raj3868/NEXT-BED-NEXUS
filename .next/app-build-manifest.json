@@ -26,15 +26,50 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/dashboard/page.js"
     ],
+    "/(dashboard)/ipd/add-room/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/add-room/page.js"
+    ],
+    "/(dashboard)/ipd/floors/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/floors/page.js"
+    ],
+    "/(dashboard)/ipd/rooms/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/rooms/page.js"
+    ],
+    "/(dashboard)/ipd/add-floor/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/add-floor/page.js"
+    ],
+    "/(dashboard)/ipd/department/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/department/page.js"
+    ],
+    "/(dashboard)/ipd/add-department/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/add-department/page.js"
+    ],
     "/(dashboard)/ipd/add-room-type/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/ipd/add-room-type/page.js"
     ],
-    "/_not-found/page": [
+    "/(dashboard)/ipd/add-bed/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/(dashboard)/ipd/add-bed/page.js"
+    ],
+    "/(dashboard)/ipd/beds/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ipd/beds/page.js"
     ]
   }
 }

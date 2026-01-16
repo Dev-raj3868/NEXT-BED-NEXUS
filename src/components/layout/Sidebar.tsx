@@ -114,7 +114,7 @@ const navItems: NavItem[] = [
         title: "Beds",
         icon: BedDouble,
         children: [
-          { title: "Add", path: "/ipd/beds/add" },
+          { title: "Add", path: "/ipd/add-bed" },
           { title: "Get", path: "/ipd/beds" },
         ],
       },

@@ -1,6 +1,7 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/ipd/add-room-type/page": "app/(dashboard)/ipd/add-room-type/page.js"
+  "/(dashboard)/ipd/department/page": "app/(dashboard)/ipd/department/page.js",
+  "/(dashboard)/ipd/add-department/page": "app/(dashboard)/ipd/add-department/page.js",
+  "/(dashboard)/ipd/add-room-type/page": "app/(dashboard)/ipd/add-room-type/page.js",
+  "/(dashboard)/ipd/add-bed/page": "app/(dashboard)/ipd/add-bed/page.js",
+  "/(dashboard)/ipd/beds/page": "app/(dashboard)/ipd/beds/page.js"
 }
