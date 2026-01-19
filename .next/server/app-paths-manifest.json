@@ -1,7 +1,15 @@
 {
-  "/(dashboard)/ipd/department/page": "app/(dashboard)/ipd/department/page.js",
-  "/(dashboard)/ipd/add-department/page": "app/(dashboard)/ipd/add-department/page.js",
-  "/(dashboard)/ipd/add-room-type/page": "app/(dashboard)/ipd/add-room-type/page.js",
-  "/(dashboard)/ipd/add-bed/page": "app/(dashboard)/ipd/add-bed/page.js",
-  "/(dashboard)/ipd/beds/page": "app/(dashboard)/ipd/beds/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/billing/get-final/page": "app/(dashboard)/billing/get-final/page.js",
+  "/(dashboard)/billing/create/page": "app/(dashboard)/billing/create/page.js",
+  "/(dashboard)/billing/search/page": "app/(dashboard)/billing/search/page.js",
+  "/(dashboard)/billing/create-final/page": "app/(dashboard)/billing/create-final/page.js",
+  "/(dashboard)/patients/add/page": "app/(dashboard)/patients/add/page.js",
+  "/(dashboard)/patients/search/page": "app/(dashboard)/patients/search/page.js",
+  "/(dashboard)/patients/transfer/page": "app/(dashboard)/patients/transfer/page.js",
+  "/(dashboard)/patients/admission-search/page": "app/(dashboard)/patients/admission-search/page.js",
+  "/(dashboard)/patients/admission-add/page": "app/(dashboard)/patients/admission-add/page.js",
+  "/(dashboard)/ipd/add-floor/page": "app/(dashboard)/ipd/add-floor/page.js",
+  "/(dashboard)/ipd/floors/page": "app/(dashboard)/ipd/floors/page.js"
 }

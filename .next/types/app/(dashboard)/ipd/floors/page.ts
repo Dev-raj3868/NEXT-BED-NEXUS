@@ -1,4 +1,4 @@
-// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\ipd\floors\page.tsx
+// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\(dashboard)\ipd\floors\page.tsx
 import * as entry from '../../../../../../app/(dashboard)/ipd/floors/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

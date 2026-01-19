@@ -802,6 +802,9 @@ video {
 .mb-2 {
   margin-bottom: 0.5rem;
 }
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
 .mb-4 {
   margin-bottom: 1rem;
 }
@@ -950,11 +953,20 @@ video {
 .max-h-\[300px\] {
   max-height: 300px;
 }
+.max-h-\[80vh\] {
+  max-height: 80vh;
+}
+.max-h-\[90vh\] {
+  max-height: 90vh;
+}
 .max-h-screen {
   max-height: 100vh;
 }
 .min-h-0 {
   min-height: 0px;
+}
+.min-h-\[100px\] {
+  min-height: 100px;
 }
 .min-h-\[60vh\] {
   min-height: 60vh;
@@ -967,9 +979,6 @@ video {
 }
 .min-h-svh {
   min-height: 100svh;
-}
-.min-h-\[100px\] {
-  min-height: 100px;
 }
 .w-0 {
   width: 0px;
@@ -1076,6 +1085,9 @@ video {
 }
 .max-w-3xl {
   max-width: 48rem;
+}
+.max-w-4xl {
+  max-width: 56rem;
 }
 .max-w-\[--skeleton-width\] {
   max-width: var(--skeleton-width);
@@ -1287,6 +1299,11 @@ video {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
+}
+.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
 }
 .space-y-4 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
@@ -1514,6 +1531,9 @@ video {
 .bg-muted {
   background-color: hsl(var(--muted));
 }
+.bg-muted\/30 {
+  background-color: hsl(var(--muted) / 0.3);
+}
 .bg-muted\/50 {
   background-color: hsl(var(--muted) / 0.5);
 }
@@ -1727,11 +1747,17 @@ video {
 .pt-4 {
   padding-top: 1rem;
 }
+.pt-6 {
+  padding-top: 1.5rem;
+}
 .text-left {
   text-align: left;
 }
 .text-center {
   text-align: center;
+}
+.text-right {
+  text-align: right;
 }
 .align-middle {
   vertical-align: middle;
@@ -2031,6 +2057,11 @@ video {
 }
 .transition-opacity {
   transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.transition-shadow {
+  transition-property: box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
@@ -3400,6 +3431,17 @@ video {
 
   .lg\:pl-0 {
     padding-left: 0px;
+  }
+}
+
+@media print {
+
+  .print\:mt-8 {
+    margin-top: 2rem;
+  }
+
+  .print\:p-8 {
+    padding: 2rem;
   }
 }
 
