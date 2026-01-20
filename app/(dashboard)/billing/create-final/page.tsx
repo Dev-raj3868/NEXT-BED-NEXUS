@@ -12,10 +12,8 @@ const AddFinalBill = () => {
   const [formData, setFormData] = useState({
     hospitalId: "",
     admissionId: "",
-    patientId: "",
     patientName: "",
     phoneNumber: "",
-    email: "",
     admissionDoctorId: "",
     admissionDoctorName: "",
     // Charge Totals
@@ -86,13 +84,13 @@ const AddFinalBill = () => {
   const totals = calculateTotals();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       <div>
         <h1 className="text-2xl font-bold text-foreground">Create Final Bill</h1>
         <p className="text-muted-foreground">Generate the final consolidated bill for discharge</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" suppressHydrationWarning>
         {/* Patient & Hospital Info */}
         <Card>
           <CardHeader>
@@ -121,16 +119,6 @@ const AddFinalBill = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="patientId">Patient ID</Label>
-                <Input
-                  id="patientId"
-                  value={formData.patientId}
-                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-                  placeholder="Enter patient ID"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="patientName">Patient Name</Label>
                 <Input
                   id="patientName"
@@ -141,23 +129,13 @@ const AddFinalBill = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="phoneNumber">Patient Mobile Number</Label>
                 <Input
                   id="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="Enter phone number"
+                  placeholder="Enter patient mobile number"
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email"
                 />
               </div>
               <div className="space-y-2">
@@ -429,7 +407,7 @@ const AddFinalBill = () => {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full">
+        <Button type="submit" size="sm">
           Create Final Bill
         </Button>
       </form>
