@@ -1,8 +1,8 @@
-// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\ipd\rooms\page.tsx
-import * as entry from '../../../../../../app/(dashboard)/ipd/rooms/page.js'
+// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\(dashboard)\patients\transfer\page.tsx
+import * as entry from '../../../../../../app/(dashboard)/patients/transfer/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
-type TEntry = typeof import('../../../../../../app/(dashboard)/ipd/rooms/page.js')
+type TEntry = typeof import('../../../../../../app/(dashboard)/patients/transfer/page.js')
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }

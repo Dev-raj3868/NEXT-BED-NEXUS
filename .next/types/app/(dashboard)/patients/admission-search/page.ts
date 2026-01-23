@@ -1,8 +1,23 @@
+<<<<<<< HEAD
+<<<<<<<< HEAD:.next/types/app/(dashboard)/patients/admission-search/page.ts
 // File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\patients\admission-search\page.tsx
+=======
+// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\(dashboard)\patients\admission-search\page.tsx
+>>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267
 import * as entry from '../../../../../../app/(dashboard)/patients/admission-search/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
 type TEntry = typeof import('../../../../../../app/(dashboard)/patients/admission-search/page.js')
+<<<<<<< HEAD
+========
+// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\(dashboard)\billing\create-final\page.tsx
+import * as entry from '../../../../../../app/(dashboard)/billing/create-final/page.js'
+import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
+
+type TEntry = typeof import('../../../../../../app/(dashboard)/billing/create-final/page.js')
+>>>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267:.next/types/app/(dashboard)/billing/create-final/page.ts
+=======
+>>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }
