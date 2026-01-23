@@ -1,7 +1,7 @@
 {
-  "/(dashboard)/ipd/department/page": "app/(dashboard)/ipd/department/page.js",
-  "/(dashboard)/ipd/add-department/page": "app/(dashboard)/ipd/add-department/page.js",
-  "/(dashboard)/ipd/add-room-type/page": "app/(dashboard)/ipd/add-room-type/page.js",
-  "/(dashboard)/ipd/add-bed/page": "app/(dashboard)/ipd/add-bed/page.js",
-  "/(dashboard)/ipd/beds/page": "app/(dashboard)/ipd/beds/page.js"
+  "/(dashboard)/ot/slots/page": "app/(dashboard)/ot/slots/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/patients/admission-search/page": "app/(dashboard)/patients/admission-search/page.js",
+  "/(dashboard)/ipd/beds/page": "app/(dashboard)/ipd/beds/page.js",
+  "/(dashboard)/ipd/rooms/page": "app/(dashboard)/ipd/rooms/page.js"
 }

@@ -6,65 +6,35 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/(auth)/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
-    ],
     "/(dashboard)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
+    ],
+    "/(dashboard)/ot/slots/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/ot/slots/page.js"
     ],
     "/(dashboard)/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/dashboard/page.js"
     ],
-    "/(dashboard)/ipd/add-room/page": [
+    "/(dashboard)/ot/add-slot/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-room/page.js"
+      "static/chunks/app/(dashboard)/ot/add-slot/page.js"
     ],
-    "/(dashboard)/ipd/floors/page": [
+    "/(dashboard)/patients/admission-search/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/floors/page.js"
+      "static/chunks/app/(dashboard)/patients/admission-search/page.js"
     ],
     "/(dashboard)/ipd/rooms/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/ipd/rooms/page.js"
-    ],
-    "/(dashboard)/ipd/add-floor/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-floor/page.js"
-    ],
-    "/(dashboard)/ipd/department/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/department/page.js"
-    ],
-    "/(dashboard)/ipd/add-department/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-department/page.js"
-    ],
-    "/(dashboard)/ipd/add-room-type/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-room-type/page.js"
-    ],
-    "/(dashboard)/ipd/add-bed/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-bed/page.js"
     ],
     "/(dashboard)/ipd/beds/page": [
       "static/chunks/webpack.js",

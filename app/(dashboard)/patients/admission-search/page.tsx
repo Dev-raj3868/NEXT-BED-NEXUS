@@ -1,336 +1,282 @@
 'use client';
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Search, Edit } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Search, Loader2, Edit2, Save, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-
-/* ---------------- MOCK DATA ---------------- */
-const mockAdmissions = [
-  { id: 1, name: "John Doe", phoneNumber: "9876543210", assignedDoctor: "Dr. Smith", admissionDate: "2026-01-05", reasonForAdmission: "Chest Pain", dischargeDate: null },
-  { id: 2, name: "Jane Smith", phoneNumber: "9876543211", assignedDoctor: "Dr. Johnson", admissionDate: "2026-01-06", reasonForAdmission: "Fracture", dischargeDate: null },
-  { id: 3, name: "Robert Wilson", phoneNumber: "9876543212", assignedDoctor: "Dr. Williams", admissionDate: "2026-01-07", reasonForAdmission: "Surgery", dischargeDate: "2026-01-08" },
-  { id: 4, name: "Emily Davis", phoneNumber: "9876543213", assignedDoctor: "Dr. Brown", admissionDate: "2026-01-07", reasonForAdmission: "Observation", dischargeDate: null },
-  { id: 5, name: "Michael Brown", phoneNumber: "9876543214", assignedDoctor: "Dr. Davis", admissionDate: "2026-01-08", reasonForAdmission: "Dialysis", dischargeDate: null },
-  { id: 6, name: "Sarah Johnson", phoneNumber: "9876543215", assignedDoctor: "Dr. Miller", admissionDate: "2026-01-04", reasonForAdmission: "Cardiac Check", dischargeDate: "2026-01-06" },
-  { id: 7, name: "David Lee", phoneNumber: "9876543216", assignedDoctor: "Dr. Taylor", admissionDate: "2026-01-03", reasonForAdmission: "Appendicitis", dischargeDate: "2026-01-05" },
-  { id: 8, name: "Lisa Anderson", phoneNumber: "9876543217", assignedDoctor: "Dr. Thomas", admissionDate: "2026-01-08", reasonForAdmission: "Pneumonia", dischargeDate: null },
-];
+import axios from "axios";
 
 const ITEMS_PER_PAGE = 5;
 
 const GetAdmission = () => {
-  /* ---------------- SEARCH INPUTS ---------------- */
-  const [searchAdmissionId, setSearchAdmissionId] = useState("");
-  const [searchName, setSearchName] = useState("");
+  const { toast } = useToast();
+  
+  /* ---------------- SEARCH STATES ---------------- */
   const [searchPhone, setSearchPhone] = useState("");
-  const [searchAdmissionDate, setSearchAdmissionDate] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [searchAdmissionId, setSearchAdmissionId] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  /* ---------------- APPLIED FILTERS ---------------- */
-  const [filters, setFilters] = useState({
-    admissionId: "",
-    name: "",
-    phone: "",
-    admissionDate: "",
-  });
-
+  /* ---------------- DATA STATES ---------------- */
+  const [admissions, setAdmissions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  /* ---------------- EDIT DIALOG ---------------- */
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [selectedAdmission, setSelectedAdmission] =
-    useState<(typeof mockAdmissions)[0] | null>(null);
+  /* ---------------- SUGGESTIONS ---------------- */
+  const [phoneSuggestions, setPhoneSuggestions] = useState<any[]>([]);
+  const [nameSuggestions, setNameSuggestions] = useState<any[]>([]);
+  const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
+  const [showNameDropdown, setShowNameDropdown] = useState(false);
 
-  /* ---------------- SEARCH ---------------- */
-  const handleSearch = () => {
-    setFilters({
-      admissionId: searchAdmissionId,
-      name: searchName,
-      phone: searchPhone,
-      admissionDate: searchAdmissionDate,
-    });
-    setCurrentPage(1);
+  /* ---------------- EDIT MODAL STATES ---------------- */
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>({});
+
+  /* ---------------- LOGIC: FETCH SUGGESTIONS ---------------- */
+  const fetchSuggestions = async (query: string, type: 'phone' | 'name') => {
+    if (query.length < 3) return;
+    try {
+      const payload = type === 'phone' ? { phone_number: query, clinic_id: "clinic001" } : { patient_name: query, clinic_id: "clinic001" };
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`, payload, { withCredentials: true });
+      if (response.data.resSuccess === 1) {
+        if (type === 'phone') { setPhoneSuggestions(response.data.data || []); setShowPhoneDropdown(true); }
+        else { setNameSuggestions(response.data.data || []); setShowNameDropdown(true); }
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  /* ---------------- LOGIC: SEARCH ADMISSIONS ---------------- */
+  const handleSearch = async () => {
+    setLoading(true);
     setHasSearched(true);
-  };
-
-  /* ---------------- RESET ---------------- */
-  const handleReset = () => {
-    setSearchAdmissionId("");
-    setSearchName("");
-    setSearchPhone("");
-    setSearchAdmissionDate("");
-
-    setFilters({
-      admissionId: "",
-      name: "",
-      phone: "",
-      admissionDate: "",
-    });
-
-    setHasSearched(false);
     setCurrentPage(1);
+    console.log("Searching with:", { selectedPatientId, searchAdmissionId, fromDate, toDate });
+    try {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/admissionAndBeds/get_admission`, {
+        clinic_id: "clinic001",
+        patient_id: selectedPatientId || undefined,
+        admission_id: searchAdmissionId || undefined,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+      }, { withCredentials: true });
+      if (response.data.resSuccess === 1) setAdmissions(response.data.data || []);
+    } catch (error) { toast({ title: "Error", variant: "destructive" }); }
+    finally { setLoading(false); }
   };
 
-  /* ---------------- FILTER LOGIC ---------------- */
-  const filteredAdmissions = mockAdmissions.filter((admission) => {
-    const matchesId = admission.id
-      .toString()
-      .includes(filters.admissionId);
-    const matchesName = admission.name
-      .toLowerCase()
-      .includes(filters.name.toLowerCase());
-    const matchesPhone = admission.phoneNumber.includes(filters.phone);
-    const matchesDate = filters.admissionDate
-      ? admission.admissionDate === filters.admissionDate
-      : true;
-
-    return matchesId && matchesName && matchesPhone && matchesDate;
-  });
-
-  /* ---------------- PAGINATION ---------------- */
-  const totalPages = Math.ceil(filteredAdmissions.length / ITEMS_PER_PAGE);
-
-  const paginatedAdmissions = filteredAdmissions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  /* ---------------- EDIT ---------------- */
-  const handleEditClick = (admission: (typeof mockAdmissions)[0]) => {
-    setSelectedAdmission(admission);
-    setShowEditDialog(true);
-  };
-
-  const handleSaveEdit = () => {
-    toast({
-      title: "Admission Updated",
-      description: "Admission details updated successfully.",
+  /* ---------------- LOGIC: OPEN EDIT MODAL ---------------- */
+  const openEditModal = (record: any) => {
+    setSelectedRecord(record);
+    setEditFormData({
+      doctor_name: record.doctor_name,
+      specialization: record.specialization,
+      admission_status: record.admission_status || "admitted",
+      remark: record.remark || "",
+      emergency_contact_name: record.emergency_contact_name || "",
+      emergency_contact_number: record.emergency_contact_number || "",
+      estimated_discharge_date: record.estimated_discharge_date ? new Date(record.estimated_discharge_date).toISOString().split('T')[0] : "",
+      discharge_date: "",
+      discharge_time: "",
+      bed_id: record.bed_id // Required for patient_tracker update in backend
     });
-    setShowEditDialog(false);
-    setSelectedAdmission(null);
+    setIsEditModalOpen(true);
   };
 
-  /* ---------------- UI ---------------- */
+  /* ---------------- LOGIC: UPDATE ADMISSION ---------------- */
+  const handleUpdateSubmission = async () => {
+    setUpdateLoading(true);
+    try {
+      const payload = {
+        hospital_id: "clinic001",
+        admission_id: selectedRecord.admission_id,
+        updated_by: "Admin", // Should be from auth context
+        updates: { ...editFormData }
+      };
+
+      console.log("Update Payload:", payload);
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/admissionAndBeds/update_admission`,
+        payload,
+        {
+          withCredentials: true
+        });
+
+      console.log("Update Response:", res.data);
+      if (res.data.resSuccess === 1) {
+        toast({ title: "Updated successfully" });
+        setIsEditModalOpen(false);
+        handleSearch(); // Refresh table
+      } else {
+        toast({ title: "Update Failed", description: res.data.message, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error connecting to server", variant: "destructive" });
+    } finally { setUpdateLoading(false); }
+  };
+
+  const handleReset = () => {
+    setSearchPhone(""); setSearchName(""); setSelectedPatientId(""); setSearchAdmissionId("");
+    setFromDate(""); setToDate(""); setAdmissions([]); setHasSearched(false);
+  };
+
+  const totalPages = Math.ceil(admissions.length / ITEMS_PER_PAGE);
+  const paginatedAdmissions = admissions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Get Admission</h1>
-        <p className="text-muted-foreground">
-          Search and view patient admissions
-        </p>
+        <p className="text-muted-foreground">Search and manage hospital admissions</p>
       </div>
 
-      {/* SEARCH */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Search Admission
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Input placeholder="Admission ID" value={searchAdmissionId} onChange={(e) => setSearchAdmissionId(e.target.value)} />
-            <Input placeholder="Patient Name" value={searchName} onChange={(e) => setSearchName(e.target.value)} />
-            <Input placeholder="Phone Number" value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} />
-            <Input type="date" value={searchAdmissionDate} onChange={(e) => setSearchAdmissionDate(e.target.value)} />
-          </div>
+      {/* --- Search Filters --- */}
+      <Card className="overflow-visible">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="space-y-2 relative">
+              <Label>Phone Number</Label>
+              <Input placeholder="Search phone..." value={searchPhone} onChange={(e) => { setSearchPhone(e.target.value); fetchSuggestions(e.target.value, 'phone'); }} onFocus={() => setShowPhoneDropdown(true)} />
+              {showPhoneDropdown && phoneSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                  {phoneSuggestions.map((p) => (
+                    <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer border-b text-sm" onClick={() => { setSearchPhone(p.phone_number); setSearchName(p.patient_name); setSelectedPatientId(p._id); setShowPhoneDropdown(false); }}>
+                      <div className="font-bold">{p.phone_number}</div>
+                      <div className="text-xs text-muted-foreground">{p.patient_name}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
+            <div className="space-y-2 relative">
+              <Label>Patient Name</Label>
+              <Input placeholder="Search name..." value={searchName} onFocus={() => setShowNameDropdown(true)} onChange={(e) => { setSearchName(e.target.value); fetchSuggestions(e.target.value, 'name'); }} />
+              {showNameDropdown && nameSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                  {nameSuggestions.map((p) => (
+                    <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer border-b text-sm" onClick={() => { setSearchName(p.patient_name); setSearchPhone(p.phone_number); setSelectedPatientId(p._id); setShowNameDropdown(false); }}>
+                      <div className="font-bold">{p.patient_name}</div>
+                      <div className="text-xs text-muted-foreground">{p.phone_number}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2"><Label>Admission ID</Label><Input placeholder="ID" value={searchAdmissionId} onChange={(e) => setSearchAdmissionId(e.target.value)} /></div>
+            <div className="space-y-2"><Label>From</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>To</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
+          </div>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={handleReset}>
-              Reset
-            </Button>
-            <Button onClick={handleSearch}>
-              <Search className="w-4 h-4 mr-2" />
-              Search
-            </Button>
+            <Button variant="outline" onClick={handleReset}>Reset</Button>
+            <Button onClick={handleSearch} disabled={loading}>{loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* TABLE */}
+      {/* --- Results Table --- */}
       <Card>
-        <CardHeader>
-          <CardTitle>Admission Records</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
+                <TableHead>Patient</TableHead>
                 <TableHead>Doctor</TableHead>
                 <TableHead>Admission Date</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Discharge Date</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
-
             <TableBody>
-              {!hasSearched ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    Please search to view admission records
+              {admissions.map((adm: any) => (
+                <TableRow key={adm._id}>
+                  <TableCell>
+                    <div className="font-medium">{adm.patient_name}</div>
+                    <div className="text-xs text-muted-foreground">{adm.phone_number}</div>
+                  </TableCell>
+                  <TableCell>{adm.doctor_name}</TableCell>
+                  <TableCell>{new Date(adm.admission_date).toLocaleDateString()}</TableCell>
+                  <TableCell><div className="text-xs font-semibold">{adm.room_name}</div></TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${adm.admission_status === 'discharge' ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {adm.admission_status || 'Admitted'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => openEditModal(adm)} disabled={adm.admission_status === 'discharge'}>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : paginatedAdmissions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    No admission records found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedAdmissions.map((admission) => (
-                  <TableRow key={admission.id}>
-                    <TableCell>{admission.name}</TableCell>
-                    <TableCell>{admission.phoneNumber}</TableCell>
-                    <TableCell>{admission.assignedDoctor}</TableCell>
-                    <TableCell>{admission.admissionDate}</TableCell>
-                    <TableCell>{admission.reasonForAdmission}</TableCell>
-                    <TableCell>
-                      {admission.dischargeDate ?? (
-                        <span className="text-muted-foreground">
-                          Not Discharged
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => handleEditClick(admission)}>
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
-
-          {/* PAGINATION */}
-          {hasSearched && totalPages > 0 && (
-            <div className="mt-4">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    />
-                  </PaginationItem>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        isActive={currentPage === page}
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-    
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-lg">
+      {/* --- Full Edit Modal --- */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Admission</DialogTitle>
+            <DialogTitle>Edit Admission Details</DialogTitle>
+            <DialogDescription>Admission ID: {selectedRecord?.admission_id}</DialogDescription>
           </DialogHeader>
-          {selectedAdmission && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editName">Patient Name</Label>
-                <Input
-                  id="editName"
-                  value={selectedAdmission.name}
-                  onChange={(e) => setSelectedAdmission({ ...selectedAdmission, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editDoctor">Assigned Doctor</Label>
-                <Select 
-                  value={selectedAdmission.assignedDoctor}
-                  onValueChange={(value) => setSelectedAdmission({ ...selectedAdmission, assignedDoctor: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Dr. Smith">Dr. Smith</SelectItem>
-                    <SelectItem value="Dr. Johnson">Dr. Johnson</SelectItem>
-                    <SelectItem value="Dr. Williams">Dr. Williams</SelectItem>
-                    <SelectItem value="Dr. Brown">Dr. Brown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editReason">Reason for Admission</Label>
-                <Textarea
-                  id="editReason"
-                  value={selectedAdmission.reasonForAdmission}
-                  onChange={(e) => setSelectedAdmission({ ...selectedAdmission, reasonForAdmission: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editDischarge">Discharge Date</Label>
-                <Input
-                  id="editDischarge"
-                  type="date"
-                  value={selectedAdmission.dischargeDate || ""}
-                  onChange={(e) => setSelectedAdmission({ ...selectedAdmission, dischargeDate: e.target.value || null })}
-                />
-              </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label>Admission Status</Label>
+              <Select value={editFormData.admission_status} onValueChange={(v) => setEditFormData({...editFormData, admission_status: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admitted">Admitted</SelectItem>
+                  <SelectItem value="discharge">Discharge</SelectItem>
+                  <SelectItem value="advance_booking">Advance Booking</SelectItem>
+                  <SelectItem value="transferred">Transferred</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            <div className="space-y-2"><Label>Doctor Name</Label><Input value={editFormData.doctor_name} onChange={(e) => setEditFormData({...editFormData, doctor_name: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Specialization</Label><Input value={editFormData.specialization} onChange={(e) => setEditFormData({...editFormData, specialization: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Est. Discharge Date</Label><Input type="date" value={editFormData.estimated_discharge_date} onChange={(e) => setEditFormData({...editFormData, estimated_discharge_date: e.target.value})} /></div>
+            
+            <div className="space-y-2"><Label>Emergency Contact Name</Label><Input value={editFormData.emergency_contact_name} onChange={(e) => setEditFormData({...editFormData, emergency_contact_name: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Emergency Contact No.</Label><Input value={editFormData.emergency_contact_number} onChange={(e) => setEditFormData({...editFormData, emergency_contact_number: e.target.value})} /></div>
+
+            {editFormData.admission_status === "discharge" && (
+              <>
+                <div className="space-y-2 p-2 bg-amber-50 rounded border border-amber-200">
+                  <Label>Discharge Date *</Label>
+                  <Input type="date" value={editFormData.discharge_date} onChange={(e) => setEditFormData({...editFormData, discharge_date: e.target.value})} required />
+                </div>
+                <div className="space-y-2 p-2 bg-amber-50 rounded border border-amber-200">
+                  <Label>Discharge Time *</Label>
+                  <Input type="time" value={editFormData.discharge_time} onChange={(e) => setEditFormData({...editFormData, discharge_time: e.target.value})} required />
+                </div>
+              </>
+            )}
+
+            <div className="md:col-span-2 space-y-2"><Label>Remark</Label><Textarea value={editFormData.remark} onChange={(e) => setEditFormData({...editFormData, remark: e.target.value})} /></div>
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateSubmission} disabled={updateLoading}>
+              {updateLoading ? <Loader2 className="animate-spin" /> : <><Save className="w-4 h-4 mr-2" />Save Changes</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

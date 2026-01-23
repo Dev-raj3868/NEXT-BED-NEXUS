@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
         ],
       },
       {
-        title: "Admin/Discharge",
+        title: "Admit/Discharge",
         icon: Users,
         children: [
           { title: "Get", path: "/patients/admission-search" },
