@@ -4,86 +4,104 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { CreditCard, Banknote, Building2, Wallet } from "lucide-react";
+
+interface ChargeCategory {
+  id: number;
+  category: string;
+  categoryCode: string;
+  count: number;
+  grossAmount: number;
+  discount: number;
+  netAmount: number;
+}
 
 const AddFinalBill = () => {
   const [formData, setFormData] = useState({
     hospitalId: "",
     admissionId: "",
-    patientId: "",
     patientName: "",
     phoneNumber: "",
-    email: "",
     admissionDoctorId: "",
     admissionDoctorName: "",
-    // Charge Totals
-    bedChargesGross: "",
-    bedChargesDiscount: "",
-    bedChargesNet: "",
-    doctorChargesGross: "",
-    doctorChargesDiscount: "",
-    doctorChargesNet: "",
-    otChargesGross: "",
-    otChargesDiscount: "",
-    otChargesNet: "",
-    miscChargesGross: "",
-    miscChargesDiscount: "",
-    miscChargesNet: "",
-    // Totals
-    totalGrossAmount: "",
-    totalItemDiscounts: "",
-    subtotal: "",
-    additionalDiscountAmount: "",
-    additionalDiscountReason: "",
-    finalPayableAmount: "",
-    paymentStatus: "",
-    billStatus: "",
-    notes: "",
   });
 
-  const calculateTotals = () => {
-    const bedNet = parseFloat(formData.bedChargesNet) || 0;
-    const doctorNet = parseFloat(formData.doctorChargesNet) || 0;
-    const otNet = parseFloat(formData.otChargesNet) || 0;
-    const miscNet = parseFloat(formData.miscChargesNet) || 0;
-    const additionalDiscount = parseFloat(formData.additionalDiscountAmount) || 0;
+  const [charges, setCharges] = useState<ChargeCategory[]>([
+    { id: 1, category: "Room Rent Services", categoryCode: "bed_charges", count: 0, grossAmount: 0, discount: 0, netAmount: 0 },
+    { id: 2, category: "Doctor & Consultant Fees", categoryCode: "doctor_charges", count: 0, grossAmount: 0, discount: 0, netAmount: 0 },
+    { id: 3, category: "Medicine & Consumables", categoryCode: "medicine_charges", count: 0, grossAmount: 0, discount: 0, netAmount: 0 },
+    { id: 4, category: "OT & Procedure Charges", categoryCode: "ot_charges", count: 0, grossAmount: 0, discount: 0, netAmount: 0 },
+    { id: 5, category: "Miscellaneous Charges", categoryCode: "misc_charges", count: 0, grossAmount: 0, discount: 0, netAmount: 0 },
+  ]);
 
-    const bedGross = parseFloat(formData.bedChargesGross) || 0;
-    const doctorGross = parseFloat(formData.doctorChargesGross) || 0;
-    const otGross = parseFloat(formData.otChargesGross) || 0;
-    const miscGross = parseFloat(formData.miscChargesGross) || 0;
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [gstPercent, setGstPercent] = useState(5);
+  const [insuranceCovered, setInsuranceCovered] = useState(80000);
+  const [paymentMethod, setPaymentMethod] = useState("cashless");
+  const [notes, setNotes] = useState("");
 
-    const bedDiscount = parseFloat(formData.bedChargesDiscount) || 0;
-    const doctorDiscount = parseFloat(formData.doctorChargesDiscount) || 0;
-    const otDiscount = parseFloat(formData.otChargesDiscount) || 0;
-    const miscDiscount = parseFloat(formData.miscChargesDiscount) || 0;
+  const grossAmount = charges.reduce((sum, item) => sum + item.grossAmount, 0);
+  const discountAmount = charges.reduce((sum, item) => sum + item.discount, 0);
+  const netBillAmount = charges.reduce((sum, item) => sum + item.netAmount, 0);
+  const gstAmount = (netBillAmount * gstPercent) / 100;
+  const totalAmountDue = netBillAmount + gstAmount;
+  const patientResponsibility = Math.max(0, totalAmountDue - insuranceCovered);
 
-    const totalGross = bedGross + doctorGross + otGross + miscGross;
-    const totalItemDiscounts = bedDiscount + doctorDiscount + otDiscount + miscDiscount;
-    const subtotal = bedNet + doctorNet + otNet + miscNet;
-    const finalPayable = subtotal - additionalDiscount;
+  const updateCharge = (id: number, field: keyof ChargeCategory, value: string | number) => {
+    setCharges(charges.map(charge => {
+      if (charge.id === id) {
+        const updated = { ...charge, [field]: value };
+        if (field === 'grossAmount' || field === 'discount') {
+          updated.netAmount = updated.grossAmount - updated.discount;
+        }
+        return updated;
+      }
+      return charge;
+    }));
+  };
 
-    return {
-      totalGrossAmount: totalGross,
-      totalItemDiscounts: totalItemDiscounts,
-      subtotal: subtotal,
-      finalPayableAmount: Math.max(0, finalPayable),
-    };
+  const removeCharge = (id: number) => {
+    if (charges.length > 1) {
+      setCharges(charges.filter(c => c.id !== id));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const totals = calculateTotals();
-    console.log("Final Bill data:", { ...formData, ...totals });
+    console.log("Final Bill data:", {
+      charges,
+      grossAmount,
+      discountPercent,
+      discountAmount,
+      netBillAmount,
+      gstPercent,
+      gstAmount,
+      totalAmountDue,
+      insuranceCovered,
+      patientResponsibility,
+      paymentMethod,
+      notes
+    });
     toast({
       title: "Success",
       description: "Final bill created successfully!",
     });
   };
 
-  const totals = calculateTotals();
+  const formatCurrency = (amount: number) => {
+    return `Rs. ${amount.toLocaleString('en-IN')}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -93,7 +111,7 @@ const AddFinalBill = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Patient & Hospital Info */}
+         {/* Patient & Hospital Info */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Patient & Hospital Information</CardTitle>
@@ -121,16 +139,6 @@ const AddFinalBill = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="patientId">Patient ID</Label>
-                <Input
-                  id="patientId"
-                  value={formData.patientId}
-                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-                  placeholder="Enter patient ID"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="patientName">Patient Name</Label>
                 <Input
                   id="patientName"
@@ -141,23 +149,13 @@ const AddFinalBill = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="phoneNumber">Patient Mobile Number</Label>
                 <Input
                   id="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="Enter phone number"
+                  placeholder="Enter patient mobile number"
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email"
                 />
               </div>
               <div className="space-y-2">
@@ -182,254 +180,228 @@ const AddFinalBill = () => {
           </CardContent>
         </Card>
 
-        {/* Charge Categories */}
+        {/* Charges Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Charge Categories</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Bill Particulars - Charges Breakdown</CardTitle>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Bed Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Bed Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesGross}
-                    onChange={(e) => setFormData({ ...formData, bedChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, bedChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesNet}
-                    onChange={(e) => setFormData({ ...formData, bedChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Doctor Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Doctor Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesGross}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesNet}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* OT Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">OT Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesGross}
-                    onChange={(e) => setFormData({ ...formData, otChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, otChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesNet}
-                    onChange={(e) => setFormData({ ...formData, otChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Misc Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Miscellaneous Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesGross}
-                    onChange={(e) => setFormData({ ...formData, miscChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, miscChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesNet}
-                    onChange={(e) => setFormData({ ...formData, miscChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-800 dark:bg-slate-900 hover:bg-slate-800 dark:hover:bg-slate-900">
+                    <TableHead className="text-white font-semibold w-20 text-center py-3">S.No</TableHead>
+                    <TableHead className="text-white font-semibold min-w-[300px] py-3">Charge Category</TableHead>
+                    <TableHead className="text-white font-semibold w-24 text-center py-3">Count</TableHead>
+                    <TableHead className="text-white font-semibold w-32 text-right py-3">Gross Amount</TableHead>
+                    <TableHead className="text-white font-semibold w-28 text-right py-3">Discount</TableHead>
+                    <TableHead className="text-white font-semibold w-32 text-right py-3 bg-green-700">Net Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {charges.map((charge, index) => (
+                    <TableRow key={charge.id} className="border-b">
+                      <TableCell className="text-center font-medium py-4">{index + 1}</TableCell>
+                      <TableCell className="py-4">
+                        <div className="space-y-1">
+                          <div className="font-semibold text-sm">{charge.category}</div>
+                          <div className="text-xs text-muted-foreground">Category: {charge.categoryCode}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center py-4">
+                        <Input
+                          type="number"
+                          value={charge.count}
+                          onChange={(e) => updateCharge(charge.id, 'count', parseInt(e.target.value) || 0)}
+                          className="w-20 text-center mx-auto"
+                          min={0}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right py-4">
+                        <Input
+                          type="number"
+                          value={charge.grossAmount}
+                          onChange={(e) => updateCharge(charge.id, 'grossAmount', parseFloat(e.target.value) || 0)}
+                          className="w-28 text-right ml-auto"
+                          min={0}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right py-4">
+                        <Input
+                          type="number"
+                          value={charge.discount}
+                          onChange={(e) => updateCharge(charge.id, 'discount', parseFloat(e.target.value) || 0)}
+                          className="w-24 text-right ml-auto"
+                          min={0}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-semibold py-4 bg-green-50 dark:bg-green-950">
+                        {formatCurrency(charge.netAmount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Totals Row */}
+                  <TableRow className="bg-slate-100 dark:bg-slate-800 font-semibold">
+                    <TableCell colSpan={2} className="text-right py-4 font-bold">
+                      TOTAL
+                    </TableCell>
+                    <TableCell className="text-center py-4">
+                      {charges.reduce((sum, item) => sum + item.count, 0)}
+                    </TableCell>
+                    <TableCell className="text-right py-4">
+                      {formatCurrency(grossAmount)}
+                    </TableCell>
+                    <TableCell className="text-right py-4">
+                      {formatCurrency(discountAmount)}
+                    </TableCell>
+                    <TableCell className="text-right py-4 bg-green-600 text-white">
+                      {formatCurrency(netBillAmount)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary & Additional Discount */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Bill Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Gross Amount:</span>
-                  <span className="font-medium">₹{totals.totalGrossAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Item Discounts:</span>
-                  <span className="font-medium text-destructive">-₹{totals.totalItemDiscounts.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm border-t pt-2">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
-                </div>
+        {/* Summary Section */}
+        <div className="flex justify-end">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Gross Amount:</span>
+                <span className="font-medium">{formatCurrency(grossAmount)}</span>
               </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="additionalDiscountAmount">Additional Discount (₹)</Label>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-600 dark:text-emerald-400">Discount (</span>
                   <Input
-                    id="additionalDiscountAmount"
                     type="number"
-                    value={formData.additionalDiscountAmount}
-                    onChange={(e) => setFormData({ ...formData, additionalDiscountAmount: e.target.value })}
-                    placeholder="0.00"
+                    value={discountPercent}
+                    onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                    className="w-14 h-6 text-center text-xs p-1"
+                    min={0}
+                    max={100}
                   />
+                  <span className="text-emerald-600 dark:text-emerald-400">%):</span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="additionalDiscountReason">Discount Reason</Label>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">- {formatCurrency(discountAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Net Bill Amount:</span>
+                <span className="font-semibold text-lg">{formatCurrency(netBillAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">GST (</span>
                   <Input
-                    id="additionalDiscountReason"
-                    value={formData.additionalDiscountReason}
-                    onChange={(e) => setFormData({ ...formData, additionalDiscountReason: e.target.value })}
-                    placeholder="Enter reason for additional discount"
+                    type="number"
+                    value={gstPercent}
+                    onChange={(e) => setGstPercent(parseFloat(e.target.value) || 0)}
+                    className="w-14 h-6 text-center text-xs p-1"
+                    min={0}
+                    max={100}
                   />
+                  <span className="text-muted-foreground">%):</span>
+                </div>
+                <span className="font-medium">{formatCurrency(gstAmount)}</span>
+              </div>
+              <div className="border-2 border-primary rounded-lg p-3 bg-primary/10">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">TOTAL AMOUNT DUE:</span>
+                  <span className="font-bold text-xl">{formatCurrency(totalAmountDue)}</span>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="flex justify-end p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <div className="text-right">
-                <span className="text-sm text-muted-foreground">Final Payable Amount</span>
-                <div className="text-2xl font-bold text-primary">
-                  ₹{totals.finalPayableAmount.toFixed(2)}
+        {/* Payment Summary & Method */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Payment Summary */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold">PAYMENT SUMMARY</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Bill Amount:</span>
+                <span className="font-medium">{formatCurrency(totalAmountDue)}</span>
+              </div>
+              <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg border border-primary/30">
+                <span className="text-muted-foreground">Insurance Covered:</span>
+                <Input
+                  type="number"
+                  value={insuranceCovered}
+                  onChange={(e) => setInsuranceCovered(parseFloat(e.target.value) || 0)}
+                  className="w-32 text-right font-medium"
+                />
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="font-semibold">Patient Responsibility:</span>
+                <span className="font-bold text-xl text-destructive">{formatCurrency(patientResponsibility)}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Method */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold">PAYMENT METHOD</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="cashless" id="cashless" />
+                  <Label htmlFor="cashless" className="flex items-center gap-2 cursor-pointer">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    Cashless (Insurance)
+                  </Label>
                 </div>
-              </div>
-            </div>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="cash" id="cash" />
+                  <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
+                    <Banknote className="h-4 w-4 text-accent-foreground" />
+                    Cash
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="cheque" id="cheque" />
+                  <Label htmlFor="cheque" className="flex items-center gap-2 cursor-pointer">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    Cheque
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="card" id="card" />
+                  <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    Card
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="paymentStatus">Payment Status</Label>
-                <Select
-                  value={formData.paymentStatus}
-                  onValueChange={(value) => setFormData({ ...formData, paymentStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payment status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="billStatus">Bill Status</Label>
-                <Select
-                  value={formData.billStatus}
-                  onValueChange={(value) => setFormData({ ...formData, billStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select bill status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="finalized">Finalized</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Enter any additional notes..."
-                rows={3}
-              />
-            </div>
+        {/* Notes */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Additional Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Enter any additional notes or remarks..."
+              rows={3}
+            />
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full" size="lg">
           Create Final Bill
         </Button>
       </form>
