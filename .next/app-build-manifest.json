@@ -11,96 +11,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
     ],
-<<<<<<< HEAD
     "/(dashboard)/ot/slots/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/ot/slots/page.js"
-=======
-    "/(dashboard)/billing/get-final/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/get-final/page.js"
->>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267
     ],
-    "/(dashboard)/dashboard/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/dashboard/page.js"
-    ],
-<<<<<<< HEAD
     "/(dashboard)/ot/add-slot/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/ot/add-slot/page.js"
-    ],
-    "/(dashboard)/patients/admission-search/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/admission-search/page.js"
-=======
-    "/(dashboard)/billing/create/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/create/page.js"
-    ],
-    "/(dashboard)/billing/search/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/search/page.js"
->>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267
-    ],
-    "/(dashboard)/billing/create-final/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/create-final/page.js"
-    ],
-    "/(dashboard)/patients/add/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/add/page.js"
-    ],
-    "/(dashboard)/patients/search/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/search/page.js"
-    ],
-    "/(dashboard)/patients/transfer/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/transfer/page.js"
-    ],
-    "/(dashboard)/patients/admission-search/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/admission-search/page.js"
-    ],
-    "/(dashboard)/patients/admission-add/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/admission-add/page.js"
-    ],
-<<<<<<< HEAD
-    "/(dashboard)/ipd/beds/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/beds/page.js"
-=======
-    "/(dashboard)/ipd/add-floor/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/add-floor/page.js"
-    ],
-    "/(dashboard)/ipd/floors/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ipd/floors/page.js"
-    ],
-    "/_not-found/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
->>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267
     ]
   }
 }

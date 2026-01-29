@@ -1,5 +1,6 @@
 'use client';
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,409 +8,241 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { Loader2, Search, Calculator } from "lucide-react";
+import axios from "axios";
 
 const AddFinalBill = () => {
+  const CLINIC_ID = "clinic001";
+  const [loading, setLoading] = useState(false);
+
+  /* ---------------- FORM STATE ---------------- */
   const [formData, setFormData] = useState({
-    hospitalId: "",
+    hospitalId: CLINIC_ID,
     admissionId: "",
+    patientId: "",
     patientName: "",
     phoneNumber: "",
+    email: "",
     admissionDoctorId: "",
     admissionDoctorName: "",
+    admissionDate: "",
+    dischargeDate: "",
     // Charge Totals
-    bedChargesGross: "",
-    bedChargesDiscount: "",
-    bedChargesNet: "",
-    doctorChargesGross: "",
-    doctorChargesDiscount: "",
-    doctorChargesNet: "",
-    otChargesGross: "",
-    otChargesDiscount: "",
-    otChargesNet: "",
-    miscChargesGross: "",
-    miscChargesDiscount: "",
-    miscChargesNet: "",
+    bedGross: 0, bedDisc: 0, bedCount: 1,
+    doctorGross: 0, doctorDisc: 0, doctorCount: 1,
+    medicineGross: 0, medicineDisc: 0, medicineCount: 1,
+    otGross: 0, otDisc: 0, otCount: 0,
+    miscGross: 0, miscDisc: 0, miscCount: 0,
     // Totals
-    totalGrossAmount: "",
-    totalItemDiscounts: "",
-    subtotal: "",
-    additionalDiscountAmount: "",
+    additionalDiscountAmount: 0,
     additionalDiscountReason: "",
-    finalPayableAmount: "",
-    paymentStatus: "",
-    billStatus: "",
+    totalPaid: 0,
+    paymentStatus: "Pending",
+    billStatus: "Pending",
     notes: "",
   });
 
-  const calculateTotals = () => {
-    const bedNet = parseFloat(formData.bedChargesNet) || 0;
-    const doctorNet = parseFloat(formData.doctorChargesNet) || 0;
-    const otNet = parseFloat(formData.otChargesNet) || 0;
-    const miscNet = parseFloat(formData.miscChargesNet) || 0;
-    const additionalDiscount = parseFloat(formData.additionalDiscountAmount) || 0;
+  /* ---------------- PATIENT SUGGESTIONS ---------------- */
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-    const bedGross = parseFloat(formData.bedChargesGross) || 0;
-    const doctorGross = parseFloat(formData.doctorChargesGross) || 0;
-    const otGross = parseFloat(formData.otChargesGross) || 0;
-    const miscGross = parseFloat(formData.miscChargesGross) || 0;
-
-    const bedDiscount = parseFloat(formData.bedChargesDiscount) || 0;
-    const doctorDiscount = parseFloat(formData.doctorChargesDiscount) || 0;
-    const otDiscount = parseFloat(formData.otChargesDiscount) || 0;
-    const miscDiscount = parseFloat(formData.miscChargesDiscount) || 0;
-
-    const totalGross = bedGross + doctorGross + otGross + miscGross;
-    const totalItemDiscounts = bedDiscount + doctorDiscount + otDiscount + miscDiscount;
-    const subtotal = bedNet + doctorNet + otNet + miscNet;
-    const finalPayable = subtotal - additionalDiscount;
-
-    return {
-      totalGrossAmount: totalGross,
-      totalItemDiscounts: totalItemDiscounts,
-      subtotal: subtotal,
-      finalPayableAmount: Math.max(0, finalPayable),
+  useEffect(() => {
+    const getSuggestions = async () => {
+      if (searchQuery.length < 3) return;
+      try {
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`, {
+          patient_name: searchQuery, clinic_id: CLINIC_ID
+        }, { withCredentials: true });
+        if (res.data.resSuccess === 1) {
+          setSuggestions(res.data.data);
+          setShowSuggestions(true);
+        }
+      } catch (err) { console.error(err); }
     };
-  };
+    const timeout = setTimeout(getSuggestions, 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const totals = calculateTotals();
-    console.log("Final Bill data:", { ...formData, ...totals });
-    toast({
-      title: "Success",
-      description: "Final bill created successfully!",
-    });
+  /* ---------------- CALCULATION LOGIC ---------------- */
+  const calculateTotals = () => {
+    const categories = [
+      { g: formData.bedGross, d: formData.bedDisc },
+      { g: formData.doctorGross, d: formData.doctorDisc },
+      { g: formData.medicineGross, d: formData.medicineDisc },
+      { g: formData.otGross, d: formData.otDisc },
+      { g: formData.miscGross, d: formData.miscDisc },
+    ];
+
+    const totalGross = categories.reduce((acc, curr) => acc + curr.g, 0);
+    const totalItemDisc = categories.reduce((acc, curr) => acc + curr.d, 0);
+    const subtotal = totalGross - totalItemDisc;
+    const finalPayable = subtotal - formData.additionalDiscountAmount;
+    const balanceDue = finalPayable - formData.totalPaid;
+
+    return { totalGross, totalItemDisc, subtotal, finalPayable, balanceDue };
   };
 
   const totals = calculateTotals();
 
+  /* ---------------- API SUBMISSION ---------------- */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const payload = {
+      hospital_id: CLINIC_ID,
+      admission_id: formData.admissionId,
+      patient_id: formData.patientId,
+      patient_name: formData.patientName,
+      phone_number: formData.phoneNumber,
+      email: formData.email,
+      admission_doctor_id: formData.admissionDoctorId,
+      admission_doctor_name: formData.admissionDoctorName,
+      admission_date: formData.admissionDate,
+      discharge_date: formData.dischargeDate,
+      created_by: "RECEPTIONIST_001", // Hardcoded for now
+
+      bed_charges_total: { gross: formData.bedGross, discount: formData.bedDisc, net: formData.bedGross - formData.bedDisc },
+      doctor_charges_total: { gross: formData.doctorGross, discount: formData.doctorDisc, net: formData.doctorGross - formData.doctorDisc },
+      medicine_charges_total: { gross: formData.medicineGross, discount: formData.medicineDisc, net: formData.medicineGross - formData.medicineDisc },
+      ot_charges_total: { gross: formData.otGross, discount: formData.otDisc, net: formData.otGross - formData.otDisc },
+      misc_charges_total: { gross: formData.miscGross, discount: formData.miscDisc, net: formData.miscGross - formData.miscDisc },
+
+      item_counts: {
+        bed_charges: formData.bedCount,
+        doctor_charges: formData.doctorCount,
+        medicine_charges: formData.medicineCount,
+        ot_charges: formData.otCount,
+        misc_charges: formData.miscCount,
+      },
+
+      total_gross_amount: totals.totalGross,
+      total_item_discounts: totals.totalItemDisc,
+      subtotal: totals.subtotal,
+      additional_discount_amount: formData.additionalDiscountAmount,
+      additional_discount_reason: formData.additionalDiscountReason,
+      final_payable_amount: totals.finalPayable,
+      total_paid: formData.totalPaid,
+      payment_status: formData.paymentStatus,
+      bill_status: formData.billStatus,
+      notes: formData.notes
+    };
+
+    try {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/api/v1/billing/create_final_bill`, payload, { withCredentials: true });
+      if (response.data.resSuccess === 1) {
+        toast({ title: "Success", description: "Bill created: " + response.data.message });
+      } else {
+        toast({ title: "Error", description: response.data.message, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Failed", description: "API Connection Error", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6" suppressHydrationWarning>
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Create Final Bill</h1>
-        <p className="text-muted-foreground">Generate the final consolidated bill for discharge</p>
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Generate Final Bill</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6" suppressHydrationWarning>
-        {/* Patient & Hospital Info */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Patient Search */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Patient & Hospital Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="hospitalId">Hospital ID</Label>
-                <Input
-                  id="hospitalId"
-                  value={formData.hospitalId}
-                  onChange={(e) => setFormData({ ...formData, hospitalId: e.target.value })}
-                  placeholder="Enter hospital ID"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="admissionId">Admission ID</Label>
-                <Input
-                  id="admissionId"
-                  value={formData.admissionId}
-                  onChange={(e) => setFormData({ ...formData, admissionId: e.target.value })}
-                  placeholder="Enter admission ID"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="patientName">Patient Name</Label>
-                <Input
-                  id="patientName"
-                  value={formData.patientName}
-                  onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
-                  placeholder="Enter patient name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Patient Mobile Number</Label>
-                <Input
-                  id="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="Enter patient mobile number"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="admissionDoctorId">Admission Doctor ID</Label>
-                <Input
-                  id="admissionDoctorId"
-                  value={formData.admissionDoctorId}
-                  onChange={(e) => setFormData({ ...formData, admissionDoctorId: e.target.value })}
-                  placeholder="Enter doctor ID"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="admissionDoctorName">Admission Doctor Name</Label>
-                <Input
-                  id="admissionDoctorName"
-                  value={formData.admissionDoctorName}
-                  onChange={(e) => setFormData({ ...formData, admissionDoctorName: e.target.value })}
-                  placeholder="Enter doctor name"
-                />
-              </div>
+          <CardHeader><CardTitle className="text-sm">Patient & Admission Link</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2 relative">
+              <Label>Search Patient</Label>
+              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Name..." />
+              {showSuggestions && (
+                <div className="absolute z-50 w-full mt-1 bg-white border shadow-lg max-h-40 overflow-auto">
+                  {suggestions.map((p) => (
+                    <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-xs" onClick={() => {
+                      setFormData({ 
+                        ...formData, patientName: p.patient_name, patientId: p._id, 
+                        admissionId: p.current_admission_id || "", phoneNumber: p.phone_number,
+                        email: p.email || ""
+                      });
+                      setSearchQuery(p.patient_name); setShowSuggestions(false);
+                    }}>{p.patient_name} ({p.phone_number})</div>
+                  ))}
+                </div>
+              )}
             </div>
+            <div className="space-y-2"><Label>Admission ID</Label><Input value={formData.admissionId} readOnly className="bg-muted" /></div>
+            <div className="space-y-2"><Label>Admission Date</Label><Input type="date" value={formData.admissionDate} onChange={(e) => setFormData({...formData, admissionDate: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Discharge Date</Label><Input type="date" value={formData.dischargeDate} onChange={(e) => setFormData({...formData, dischargeDate: e.target.value})} /></div>
           </CardContent>
         </Card>
 
-        {/* Charge Categories */}
+        {/* Charge Grid */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Charge Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Bed Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Bed Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesGross}
-                    onChange={(e) => setFormData({ ...formData, bedChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, bedChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.bedChargesNet}
-                    onChange={(e) => setFormData({ ...formData, bedChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Doctor Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Doctor Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesGross}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.doctorChargesNet}
-                    onChange={(e) => setFormData({ ...formData, doctorChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* OT Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">OT Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesGross}
-                    onChange={(e) => setFormData({ ...formData, otChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, otChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.otChargesNet}
-                    onChange={(e) => setFormData({ ...formData, otChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Misc Charges */}
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium mb-3">Miscellaneous Charges</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Gross (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesGross}
-                    onChange={(e) => setFormData({ ...formData, miscChargesGross: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Discount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesDiscount}
-                    onChange={(e) => setFormData({ ...formData, miscChargesDiscount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Net (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.miscChargesNet}
-                    onChange={(e) => setFormData({ ...formData, miscChargesNet: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Summary & Additional Discount */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Bill Summary</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-sm">Itemized Charges</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Gross Amount:</span>
-                  <span className="font-medium">₹{totals.totalGrossAmount.toFixed(2)}</span>
+            {['bed', 'doctor', 'medicine', 'ot', 'misc'].map((key) => (
+              <div key={key} className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 border rounded-md items-end">
+                <div className="space-y-1"><Label className="capitalize font-bold">{key} Gross (₹)</Label>
+                  <Input type="number" value={(formData as any)[`${key}Gross`]} onChange={(e) => setFormData({...formData, [`${key}Gross`]: Number(e.target.value)})} />
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Item Discounts:</span>
-                  <span className="font-medium text-destructive">-₹{totals.totalItemDiscounts.toFixed(2)}</span>
+                <div className="space-y-1"><Label>Discount (₹)</Label>
+                  <Input type="number" value={(formData as any)[`${key}Disc`]} onChange={(e) => setFormData({...formData, [`${key}Disc`]: Number(e.target.value)})} />
                 </div>
-                <div className="flex justify-between text-sm border-t pt-2">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
+                <div className="space-y-1"><Label>Item Count</Label>
+                  <Input type="number" value={(formData as any)[`${key}Count`]} onChange={(e) => setFormData({...formData, [`${key}Count`]: Number(e.target.value)})} />
                 </div>
+                <div className="text-right pb-2 text-xs font-mono">Net: ₹{(formData as any)[`${key}Gross`] - (formData as any)[`${key}Disc`]}</div>
               </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="additionalDiscountAmount">Additional Discount (₹)</Label>
-                  <Input
-                    id="additionalDiscountAmount"
-                    type="number"
-                    value={formData.additionalDiscountAmount}
-                    onChange={(e) => setFormData({ ...formData, additionalDiscountAmount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="additionalDiscountReason">Discount Reason</Label>
-                  <Input
-                    id="additionalDiscountReason"
-                    value={formData.additionalDiscountReason}
-                    onChange={(e) => setFormData({ ...formData, additionalDiscountReason: e.target.value })}
-                    placeholder="Enter reason for additional discount"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <div className="text-right">
-                <span className="text-sm text-muted-foreground">Final Payable Amount</span>
-                <div className="text-2xl font-bold text-primary">
-                  ₹{totals.finalPayableAmount.toFixed(2)}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="paymentStatus">Payment Status</Label>
-                <Select
-                  value={formData.paymentStatus}
-                  onValueChange={(value) => setFormData({ ...formData, paymentStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payment status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="billStatus">Bill Status</Label>
-                <Select
-                  value={formData.billStatus}
-                  onValueChange={(value) => setFormData({ ...formData, billStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select bill status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="finalized">Finalized</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Enter any additional notes..."
-                rows={3}
-              />
-            </div>
+            ))}
           </CardContent>
         </Card>
 
-        <Button type="submit" size="sm">
-          Create Final Bill
-        </Button>
+        {/* Final Calculation & Submission */}
+        <Card className="bg-slate-50 border-2 border-primary/20">
+          <CardContent className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <div className="flex justify-between"><span>Total Gross:</span><span>₹{totals.totalGross}</span></div>
+                <div className="flex justify-between text-red-600"><span>Item Discounts:</span><span>-₹{totals.totalItemDisc}</span></div>
+                <div className="flex justify-between border-t pt-2 font-bold text-lg"><span>Subtotal:</span><span>₹{totals.subtotal}</span></div>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                   <div className="space-y-1"><Label>Additional Discount</Label><Input type="number" value={formData.additionalDiscountAmount} onChange={(e) => setFormData({...formData, additionalDiscountAmount: Number(e.target.value)})} /></div>
+                   <div className="space-y-1"><Label>Total Paid (Adv)</Label><Input type="number" value={formData.totalPaid} onChange={(e) => setFormData({...formData, totalPaid: Number(e.target.value)})} /></div>
+                </div>
+                <Input placeholder="Reason for discount" value={formData.additionalDiscountReason} onChange={(e) => setFormData({...formData, additionalDiscountReason: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-center p-4 bg-white rounded-lg border shadow-sm">
+               <div className="text-center md:text-left">
+                  <p className="text-sm text-muted-foreground uppercase">Balance Due</p>
+                  <p className={`text-3xl font-black ${totals.balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>₹{totals.balanceDue}</p>
+               </div>
+               <div className="flex gap-4 mt-4 md:mt-0">
+                  <div className="space-y-1">
+                    <Label>Bill Status</Label>
+                    <Select value={formData.billStatus} onValueChange={(v:any) => setFormData({...formData, billStatus: v})}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Paid">Paid</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Final Payable</p>
+                    <p className="text-2xl font-bold">₹{totals.finalPayable}</p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="space-y-2"><Label>Billing Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} /></div>
+
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2" /> : <Calculator className="mr-2" />}
+              Generate Final Bill & Finalize Discharge
+            </Button>
+          </CardContent>
+        </Card>
       </form>
     </div>
   );

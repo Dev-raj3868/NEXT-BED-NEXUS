@@ -1,10 +1,5 @@
-<<<<<<< HEAD:.next/types/app/(dashboard)/ot/slots/page.ts
 // File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\ot\slots\page.tsx
 import * as entry from '../../../../../../app/(dashboard)/ot/slots/page.js'
-=======
-// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\(dashboard)\ipd\floors\page.tsx
-import * as entry from '../../../../../../app/(dashboard)/ipd/floors/page.js'
->>>>>>> 9ca1ed335cb1aa32e4bd791315e87211aaa62267:.next/types/app/(dashboard)/ipd/floors/page.ts
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
 type TEntry = typeof import('../../../../../../app/(dashboard)/ot/slots/page.js')
