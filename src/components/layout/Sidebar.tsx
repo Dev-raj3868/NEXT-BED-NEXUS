@@ -154,6 +154,8 @@ const navItems: NavItem[] = [
     title: "Billing/Finance",
     icon: Receipt,
     children: [
+      { title: "Payment", icon: Receipt, path: "/billing/payment" },
+      { title: "Get Payment", icon: Receipt, path: "/billing/get-payment" },
       { title: "Create Bill", icon: Receipt, path: "/billing/create" },
       { title: "Get Bill", icon: Receipt, path: "/billing/search" },
       { title: "Create Final Bill", icon: Receipt, path: "/billing/create-final" },
@@ -201,6 +203,7 @@ export default function Sidebar() {
     <>
       {/* Mobile toggle */}
       <Button
+        suppressHydrationWarning
         variant="ghost"
         size="icon"
         className="fixed top-4 left-4 z-50 lg:hidden"
@@ -254,6 +257,7 @@ export default function Sidebar() {
               ) : item.nestedChildren ? (
                 <>
                   <button
+                    suppressHydrationWarning
                     onClick={() => toggleExpand(item.title)}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
@@ -276,6 +280,7 @@ export default function Sidebar() {
                       {item.nestedChildren.map((nested) => (
                         <div key={nested.title}>
                           <button
+                            suppressHydrationWarning
                             onClick={() => toggleNestedExpand(nested.title)}
                             className={cn(
                               "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
@@ -320,6 +325,7 @@ export default function Sidebar() {
               ) : (
                 <>
                   <button
+                    suppressHydrationWarning
                     onClick={() => toggleExpand(item.title)}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
