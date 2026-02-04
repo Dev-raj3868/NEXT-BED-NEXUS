@@ -21,27 +21,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
     ],
-<<<<<<< HEAD
-    "/(dashboard)/ot/slots/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ot/slots/page.js"
-    ],
-    "/(dashboard)/ot/add-slot/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/ot/add-slot/page.js"
-=======
     "/(dashboard)/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/dashboard/page.js"
     ],
-    "/(dashboard)/billing/create-final/page": [
+    "/(dashboard)/billing/get-payment/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/create-final/page.js"
->>>>>>> 130a76eeaba15a67cd99dd2a303a9dc6ad75ceeb
+      "static/chunks/app/(dashboard)/billing/get-payment/page.js"
     ]
   }
 }

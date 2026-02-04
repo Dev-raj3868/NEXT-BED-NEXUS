@@ -1,16 +1,8 @@
-<<<<<<<< HEAD:.next/types/app/(dashboard)/ot/slots/page.ts
-// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\(dashboard)\ot\slots\page.tsx
-import * as entry from '../../../../../../app/(dashboard)/ot/slots/page.js'
-import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
-
-type TEntry = typeof import('../../../../../../app/(dashboard)/ot/slots/page.js')
-========
-// File: D:\Nexus 1\Bed\next\NEXT-BED-NEXUS\app\page.tsx
+// File: G:\programming\web dev\work\NEXT-BED-NEXUS\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
 type TEntry = typeof import('../../../app/page.js')
->>>>>>>> 130a76eeaba15a67cd99dd2a303a9dc6ad75ceeb:.next/types/app/page.ts
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }

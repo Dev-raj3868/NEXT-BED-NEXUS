@@ -1,10 +1,6 @@
 {
-<<<<<<< HEAD
-  "/(dashboard)/ot/slots/page": "app/(dashboard)/ot/slots/page.js",
-  "/(dashboard)/ot/add-slot/page": "app/(dashboard)/ot/add-slot/page.js"
-=======
+  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/billing/create-final/page": "app/(dashboard)/billing/create-final/page.js"
->>>>>>> 130a76eeaba15a67cd99dd2a303a9dc6ad75ceeb
+  "/(dashboard)/billing/get-payment/page": "app/(dashboard)/billing/get-payment/page.js"
 }
