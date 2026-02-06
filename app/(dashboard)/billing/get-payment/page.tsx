@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye } from "lucide-react";
+import { Search, Eye, RotateCcw, Loader2 } from "lucide-react";
+import axios from "axios";
+import { format } from "date-fns";
 import {
   Pagination,
   PaginationContent,
@@ -22,206 +24,234 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-const mockPayments = [
-  { 
-    id: "PAY001", 
-    bookingId: "BOK001",
-    otName: "OT-1", 
-    doctorName: "Dr. Sharma", 
-    status: "Completed", 
-    date: "2026-01-20", 
-    patientName: "Rahul Kumar",
-    age: 35,
-    gender: "Male"
-  },
-  { 
-    id: "PAY002", 
-    bookingId: "BOK002",
-    otName: "OT-2", 
-    doctorName: "Dr. Patel", 
-    status: "Pending", 
-    date: "2026-01-19", 
-    patientName: "Priya Singh",
-    age: 28,
-    gender: "Female"
-  },
-  { 
-    id: "PAY003", 
-    bookingId: "BOK003",
-    otName: "OT-3", 
-    doctorName: "Dr. Verma", 
-    status: "Completed", 
-    date: "2026-01-18", 
-    patientName: "Amit Verma",
-    age: 45,
-    gender: "Male"
-  },
-  { 
-    id: "PAY004", 
-    bookingId: "BOK004",
-    otName: "OT-1", 
-    doctorName: "Dr. Das", 
-    status: "Cancelled", 
-    date: "2026-01-17", 
-    patientName: "Sneha Das",
-    age: 32,
-    gender: "Female"
-  },
-  { 
-    id: "PAY005", 
-    bookingId: "BOK005",
-    otName: "OT-2", 
-    doctorName: "Dr. Rao", 
-    status: "Completed", 
-    date: "2026-01-16", 
-    patientName: "Vikram Rao",
-    age: 50,
-    gender: "Male"
-  },
-];
+import { toast } from "@/hooks/use-toast";
 
 const GetPayment = () => {
-  const [searchData, setSearchData] = useState({
-    bookingId: "",
-    otName: "",
-    doctorName: "",
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showResults, setShowResults] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<typeof mockPayments[0] | null>(null);
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(mockPayments.length / itemsPerPage);
+  const CLINIC_ID = "clinic001";
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Create a ref for the entire search container
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  /* ---------------- SEARCH STATES ---------------- */
+  const [searchData, setSearchData] = useState({
+    billId: "",
+    admissionId: "",
+    patientId: "",
+    fromDate: "",
+    toDate: "",
+  });
+
+  /* ---------------- PATIENT SUGGESTION STATES ---------------- */
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  /* ---------------- DATA STATES ---------------- */
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // If the click is NOT within the searchContainerRef, close suggestions
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    // Attach listener to document
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      // Cleanup listener on unmount
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  /* ---------------- FETCH PATIENT SUGGESTIONS ---------------- */
+  useEffect(() => {
+    const getSuggestions = async () => {
+      if (searchQuery.length < 3) return;
+      try {
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`, {
+          patient_name: searchQuery,
+          clinic_id: CLINIC_ID
+        }, { withCredentials: true });
+        if (res.data.resSuccess === 1) {
+          setSuggestions(res.data.data);
+          setShowSuggestions(true);
+        }
+      } catch (err) { console.error(err); }
+    };
+    const timeout = setTimeout(getSuggestions, 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  /* ---------------- API CALL: GET PAYMENTS ---------------- */
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Search data:", searchData);
+    setLoading(true);
     setShowResults(true);
+
+    const payload = {
+      hospital_id: CLINIC_ID,
+      bill_id: searchData.billId || undefined,
+      admission_id: searchData.admissionId || undefined,
+      patient_id: searchData.patientId || undefined,
+      from_date: searchData.fromDate || undefined,
+      to_date: searchData.toDate || undefined,
+    };
+
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/billing/get_payment`,
+        payload,
+        { withCredentials: true }
+      );
+
+      if (response.data.resSuccess === 1) {
+        setPayments(response.data.data || []);
+      } else {
+        setPayments([]);
+        toast({ title: "No results", description: response.data.message });
+      }
+    } catch (error) {
+      console.error("Fetch Error:", error);
+      toast({ title: "Error", description: "Failed to fetch records", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
-    setSearchData({ bookingId: "", otName: "", doctorName: "" });
+    setSearchData({ billId: "", admissionId: "", patientId: "", fromDate: "", toDate: "" });
+    setSearchQuery("");
     setShowResults(false);
+    setPayments([]);
     setCurrentPage(1);
   };
 
-  const handleViewPayment = (payment: typeof mockPayments[0]) => {
-    setSelectedPayment(payment);
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-green-100 text-green-800";
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "Cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  const totalPages = Math.ceil(payments.length / itemsPerPage);
+  const paginatedPayments = payments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Get Payments</h1>
-        <p className="text-muted-foreground">Search and view payment records</p>
+        <h1 className="text-2xl font-bold text-foreground">Payment Records</h1>
+        <p className="text-muted-foreground">Search and audit all hospital transaction records</p>
       </div>
 
-      {/* Search Form */}
-      <Card>
+      <Card className="overflow-visible">
         <CardHeader>
-          <CardTitle className="text-lg">Search Payments</CardTitle>
+          <CardTitle className="text-lg">Filter Payments</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="bookingId">Booking ID</Label>
-                <Input
-                  id="bookingId"
-                  value={searchData.bookingId}
-                  onChange={(e) => setSearchData({ ...searchData, bookingId: e.target.value })}
-                  placeholder="Enter booking ID"
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Patient Autocomplete */}
+              <div className="space-y-2 relative" ref={searchContainerRef}>
+                <Label>Patient Name Search</Label>
+                <Input 
+                  placeholder="Type name..." 
+                  value={searchQuery} 
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value.length >= 3) setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                  }}
                 />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto border-slate-200">
+                    {suggestions.map((p) => (
+                      <div 
+                        key={p._id} 
+                        className="p-2 hover:bg-slate-100 cursor-pointer border-b last:border-0 text-sm" 
+                        onClick={() => {
+                          setSearchData({ ...searchData, patientId: p._id });
+                          setSearchQuery(p.patient_name);
+                          setShowSuggestions(false); // Close after selection
+                        }}
+                      >
+                        <div className="font-bold">{p.patient_name}</div>
+                        <div className="text-[10px] text-muted-foreground">{p.phone_number}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="otName">OT Name</Label>
-                <Input
-                  id="otName"
-                  value={searchData.otName}
-                  onChange={(e) => setSearchData({ ...searchData, otName: e.target.value })}
-                  placeholder="Enter OT name"
-                />
+                <Label>Admission ID</Label>
+                <Input value={searchData.admissionId} onChange={(e) => setSearchData({...searchData, admissionId: e.target.value})} placeholder="ADM-..." />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="doctorName">Doctor Name</Label>
-                <Input
-                  id="doctorName"
-                  value={searchData.doctorName}
-                  onChange={(e) => setSearchData({ ...searchData, doctorName: e.target.value })}
-                  placeholder="Enter doctor name"
-                />
+                <Label>From Date</Label>
+                <Input type="date" value={searchData.fromDate} onChange={(e) => setSearchData({...searchData, fromDate: e.target.value})} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>To Date</Label>
+                <Input type="date" value={searchData.toDate} onChange={(e) => setSearchData({...searchData, toDate: e.target.value})} />
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" className="w-full md:w-auto">
-                <Search className="w-4 h-4 mr-2" />
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={handleReset}><RotateCcw className="w-4 h-4 mr-2" /> Reset</Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
                 Search
-              </Button>
-              <Button type="button" variant="outline" onClick={handleReset} className="w-full md:w-auto">
-                Reset
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
 
-      {/* Results Table */}
       {showResults && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Payment Records</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Payment ID</TableHead>
-                  <TableHead>Booking ID</TableHead>
-                  <TableHead>OT Name</TableHead>
-                  <TableHead>Doctor Name</TableHead>
                   <TableHead>Patient Name</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Action</TableHead>
+                  <TableHead className="text-right">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="font-medium">{payment.id}</TableCell>
-                    <TableCell>{payment.bookingId}</TableCell>
-                    <TableCell>{payment.otName}</TableCell>
-                    <TableCell>{payment.doctorName}</TableCell>
-                    <TableCell>{payment.patientName}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeColor(payment.status)}>
-                        {payment.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{payment.date}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => handleViewPayment(payment)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {loading ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                ) : paginatedPayments.length > 0 ? (
+                  paginatedPayments.map((pay) => (
+                    <TableRow key={pay._id}>
+                      <TableCell className="font-mono text-xs">{pay.payment_id}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{pay.patient_id?.patient_name}</div>
+                        <div className="text-[10px] text-muted-foreground">{pay.patient_id?.phone_number}</div>
+                      </TableCell>
+                      <TableCell><Badge variant="outline">{pay.payment_method}</Badge></TableCell>
+                      <TableCell className="text-xs">{pay.payment_type}</TableCell>
+                      <TableCell className="font-bold text-green-700">₹{pay.amount_paid}</TableCell>
+                      <TableCell>{format(new Date(pay.payment_date), "dd MMM yyyy")}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedPayment(pay)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={7} className="text-center py-10">No records found</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
 
@@ -230,27 +260,11 @@ const GetPayment = () => {
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
+                      <PaginationPrevious onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
                     </PaginationItem>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <PaginationItem key={i + 1}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(i + 1)}
-                          isActive={currentPage === i + 1}
-                          className="cursor-pointer"
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
+                    <PaginationItem><PaginationLink isActive>{currentPage}</PaginationLink></PaginationItem>
                     <PaginationItem>
-                      <PaginationNext
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
+                      <PaginationNext onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
                     </PaginationItem>
                   </PaginationContent>
                 </Pagination>
@@ -260,52 +274,36 @@ const GetPayment = () => {
         </Card>
       )}
 
-      {/* Payment Details Dialog */}
+      {/* Detail Dialog */}
       <Dialog open={!!selectedPayment} onOpenChange={() => setSelectedPayment(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Payment Details - {selectedPayment?.id}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Payment Summary</DialogTitle></DialogHeader>
           {selectedPayment && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-4 pt-2">
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-muted-foreground text-sm">Receipt No:</span>
+                <span className="font-mono font-bold text-sm">{selectedPayment.payment_id}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-muted-foreground">Booking ID:</span>{" "}
-                  <span className="font-medium">{selectedPayment.bookingId}</span>
+                  <Label className="text-[10px] uppercase text-muted-foreground">Patient</Label>
+                  <p className="text-sm font-semibold">{selectedPayment.patient_id?.patient_name}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">OT Name:</span>{" "}
-                  <span className="font-medium">{selectedPayment.otName}</span>
+                  <Label className="text-[10px] uppercase text-muted-foreground">Amount Paid</Label>
+                  <p className="text-lg font-bold text-green-600">₹{selectedPayment.amount_paid}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Doctor Name:</span>{" "}
-                  <span className="font-medium">{selectedPayment.doctorName}</span>
+                  <Label className="text-[10px] uppercase text-muted-foreground">Admission ID</Label>
+                  <p className="text-xs font-mono">{selectedPayment.admission_id}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Status:</span>{" "}
-                  <Badge className={getStatusBadgeColor(selectedPayment.status)}>
-                    {selectedPayment.status}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Patient Name:</span>{" "}
-                  <span className="font-medium">{selectedPayment.patientName}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Date:</span>{" "}
-                  <span className="font-medium">{selectedPayment.date}</span>
+                  <Label className="text-[10px] uppercase text-muted-foreground">Method</Label>
+                  <p className="text-sm">{selectedPayment.payment_method}</p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm border-t pt-4">
-                <div>
-                  <span className="text-muted-foreground">Age:</span>{" "}
-                  <span className="font-medium">{selectedPayment.age} years</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Gender:</span>{" "}
-                  <span className="font-medium">{selectedPayment.gender}</span>
-                </div>
+              <div className="bg-muted p-3 rounded-md text-xs">
+                <strong>Transaction Date:</strong> {format(new Date(selectedPayment.payment_date), "PPPP p")}
               </div>
             </div>
           )}
