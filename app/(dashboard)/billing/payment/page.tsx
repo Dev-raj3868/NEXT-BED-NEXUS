@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,8 @@ interface PaymentForm {
 
 export default function PaymentPage() {
   const CLINIC_ID = "clinic001";
+  const nameRef = useRef<HTMLDivElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<PaymentForm>({
     hospital_id: CLINIC_ID,
@@ -47,28 +49,76 @@ export default function PaymentPage() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  /* ---------------- PATIENT SUGGESTIONS LOGIC ---------------- */
+  // Suggestion States
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showNameDropdown, setShowNameDropdown] = useState(false);
+  const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
 
-  const fetchSuggestions = async (query: string, type: 'name' | 'phone') => {
-    if (query.length < 3) return;
+  /* ---------------- CLICK OUTSIDE LOGIC ---------------- */
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowNameDropdown(false);
+      if (phoneRef.current && !phoneRef.current.contains(e.target as Node)) setShowPhoneDropdown(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  /* ---------------- DEBOUNCED FETCH LOGIC ---------------- */
+  // Unified debounce for both name and phone search using the Admission API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchName.length >= 3) fetchAdmissionSuggestions(searchName, 0); // type 0 for general search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchName]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchPhone.length >= 3) fetchAdmissionSuggestions(searchPhone, 0); 
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchPhone]);
+
+  const fetchAdmissionSuggestions = async (query: string, type: number) => {
     try {
-      const payload = type === 'name' 
-        ? { patient_name: query, clinic_id: CLINIC_ID } 
-        : { phone_number: query, clinic_id: CLINIC_ID };
-
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`, 
-        payload, 
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`, 
+        { 
+          search: query, 
+          type: type, 
+          hospital_id: CLINIC_ID 
+        }, 
         { withCredentials: true }
       );
+      
       if (res.data.resSuccess === 1) {
         setSuggestions(res.data.data);
-        setShowSuggestions(true);
+        // Determine which dropdown to show based on what user is typing
+        if (searchName.length >= 3 && document.activeElement === nameRef.current?.querySelector('input')) {
+          setShowNameDropdown(true);
+        }
+        if (searchPhone.length >= 3 && document.activeElement === phoneRef.current?.querySelector('input')) {
+          setShowPhoneDropdown(true);
+        }
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Fetch suggestions error", err); }
+  };
+
+  /* ---------------- SELECTION LOGIC ---------------- */
+  const handleSelectPatient = (p: any) => {
+    setSearchName(p.patient_name);
+    setSearchPhone(p.phone_number);
+    setShowNameDropdown(false);
+    setShowPhoneDropdown(false);
+    
+    // Auto-fill IDs from the admission suggestion response
+    setFormData(prev => ({ 
+      ...prev, 
+      patient_id: p.patient_id, 
+      admission_id: p._id // Based on your handler, _id is the internal Admission document ID
+    }));
   };
 
   const handleChange = (field: keyof PaymentForm, value: string | number) => {
@@ -78,15 +128,11 @@ export default function PaymentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     try {
-      console.log("Submitting Payment Data:", formData);
       const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/billing/add_payment`,
-        formData,
-        { withCredentials: true }
+        formData, { withCredentials: true }
       );
-      console.log("Payment Response:", response.data);
-
+      console.log("Payment API response", response.data);
       if (response.data.resSuccess === 1) {
         toast({ title: "Success", description: "Payment recorded successfully" });
         setFormData({
@@ -94,56 +140,42 @@ export default function PaymentPage() {
           amount_paid: 0, payment_method: '', reference_id: '',
           payment_notes: '', payment_type: '', created_by: 'RECEPTIONIST_001',
         });
-        setSearchName("");
-        setSearchPhone("");
+        setSearchName(""); setSearchPhone("");
       } else {
         toast({ title: "Error", description: response.data.message, variant: "destructive" });
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to connect to server", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+      toast({ title: "Error", description: "Server Error", variant: "destructive" });
+    } finally { setIsLoading(false); }
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Payment Processing</h1>
-        <p className="text-muted-foreground mt-2">Manage patient transactions and advance deposits</p>
-      </div>
+      <h1 className="text-3xl font-bold tracking-tight">Payment Processing</h1>
 
-      <Card className="overflow-visible shadow-sm border-muted">
+      <Card className="overflow-visible">
         <CardHeader>
-          <CardTitle>Transaction Entry</CardTitle>
-          <CardDescription>Search patient to auto-fill Patient ID</CardDescription>
+          <CardTitle>Receive Payment</CardTitle>
+          <CardDescription>Search admitted patients to auto-fill details</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               
-              {/* Patient Name Search */}
-              <div className="space-y-2 relative">
-                <Label>Patient Name Search</Label>
+              {/* Name Search */}
+              <div className="space-y-2 relative" ref={nameRef}>
+                <Label>Patient Name</Label>
                 <Input 
                   placeholder="Type name..." 
                   value={searchName} 
-                  onChange={(e) => {
-                    setSearchName(e.target.value);
-                    fetchSuggestions(e.target.value, 'name');
-                  }} 
+                  onChange={(e) => setSearchName(e.target.value)} 
                 />
-                {showSuggestions && searchName.length >= 3 && (
+                {showNameDropdown && suggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-xl max-h-48 overflow-auto">
                     {suggestions.map((p) => (
-                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0" onClick={() => {
-                        setFormData({ ...formData, patient_id: p._id, admission_id: p.current_admission_id || "" });
-                        setSearchName(p.patient_name);
-                        setSearchPhone(p.phone_number);
-                        setShowSuggestions(false);
-                      }}>
+                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0" onClick={() => handleSelectPatient(p)}>
                         <div className="font-bold text-sm">{p.patient_name}</div>
-                        <div className="text-[10px] text-muted-foreground">{p.phone_number} | ID: {p._id}</div>
+                        <div className="text-[10px] text-muted-foreground">ID: {p.admission_id} | {p.phone_number}</div>
                       </div>
                     ))}
                   </div>
@@ -151,59 +183,43 @@ export default function PaymentPage() {
               </div>
 
               {/* Phone Search */}
-              <div className="space-y-2">
-                <Label>Phone Number Search</Label>
+              <div className="space-y-2 relative" ref={phoneRef}>
+                <Label>Phone Number</Label>
                 <Input 
                   placeholder="Type phone..." 
                   value={searchPhone} 
-                  onChange={(e) => {
-                    setSearchPhone(e.target.value);
-                    fetchSuggestions(e.target.value, 'phone');
-                  }} 
+                  onChange={(e) => setSearchPhone(e.target.value)} 
                 />
+                {showPhoneDropdown && suggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-xl max-h-48 overflow-auto">
+                    {suggestions.map((p) => (
+                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0" onClick={() => handleSelectPatient(p)}>
+                        <div className="font-bold text-sm">{p.phone_number}</div>
+                        <div className="text-[10px] text-muted-foreground">{p.patient_name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Patient ID (Auto-filled but Editable) */}
               <div className="space-y-2">
                 <Label>Patient ID</Label>
-                <Input 
-                  value={formData.patient_id} 
-                  onChange={(e) => handleChange('patient_id', e.target.value)} 
-                  placeholder="Enter or select patient"
-                  required
-                />
+                <Input value={formData.patient_id} onChange={(e) => handleChange('patient_id', e.target.value)} placeholder="Auto-filled" required />
               </div>
 
-              {/* Admission ID (Editable) */}
               <div className="space-y-2">
                 <Label>Admission ID</Label>
-                <Input 
-                  value={formData.admission_id} 
-                  onChange={(e) => handleChange('admission_id', e.target.value)} 
-                  placeholder="ADM-..." 
-                />
+                <Input value={formData.admission_id} onChange={(e) => handleChange('admission_id', e.target.value)} placeholder="Auto-filled" required />
               </div>
 
-              {/* Bill ID (Editable) */}
               <div className="space-y-2">
                 <Label>Bill ID</Label>
-                <Input 
-                  value={formData.bill_id} 
-                  onChange={(e) => handleChange('bill_id', e.target.value)} 
-                  placeholder="BILL-..." 
-                  required
-                />
+                <Input value={formData.bill_id} onChange={(e) => handleChange('bill_id', e.target.value)} placeholder="Enter Bill ID" required />
               </div>
 
               <div className="space-y-2">
                 <Label>Amount Paid (₹)</Label>
-                <Input
-                  type="number"
-                  value={formData.amount_paid || ""}
-                  onChange={(e) => handleChange('amount_paid', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  required
-                />
+                <Input type="number" value={formData.amount_paid || ""} onChange={(e) => handleChange('amount_paid', parseFloat(e.target.value) || 0)} required />
               </div>
 
               <div className="space-y-2">
@@ -211,12 +227,9 @@ export default function PaymentPage() {
                 <Select value={formData.payment_method} onValueChange={(v) => handleChange('payment_method', v)}>
                   <SelectTrigger><SelectValue placeholder="Select Method" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Cash">Cash</SelectItem>
-                    <SelectItem value="Card">Card</SelectItem>
-                    <SelectItem value="Cheque">Cheque</SelectItem>
-                    <SelectItem value="UPI">UPI</SelectItem>
-                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="Insurance">Insurance</SelectItem>
+                    {["Cash", "Card", "Cheque", "UPI", "Bank Transfer", "Insurance"].map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -234,26 +247,18 @@ export default function PaymentPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Reference ID (Txn No.)</Label>
-                <Input
-                  value={formData.reference_id}
-                  onChange={(e) => handleChange('reference_id', e.target.value)}
-                  placeholder="Transaction ID"
-                />
+                <Label>Reference ID</Label>
+                <Input value={formData.reference_id} onChange={(e) => handleChange('reference_id', e.target.value)} placeholder="Txn ID / Ref" />
               </div>
 
               <div className="space-y-2 md:col-span-2 lg:col-span-3">
                 <Label>Payment Notes</Label>
-                <Input
-                  value={formData.payment_notes}
-                  onChange={(e) => handleChange('payment_notes', e.target.value)}
-                  placeholder="Remarks..."
-                />
+                <Input value={formData.payment_notes} onChange={(e) => handleChange('payment_notes', e.target.value)} placeholder="Remarks..." />
               </div>
             </div>
 
             <Button type="submit" disabled={isLoading} className="w-full h-12">
-              {isLoading ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : "Complete Transaction"}
+              {isLoading ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : "Record Payment"}
             </Button>
           </form>
         </CardContent>

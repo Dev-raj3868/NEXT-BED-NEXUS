@@ -1,1 +1,6 @@
-{}
+{
+  "/(dashboard)/billing/payment/page": "app/(dashboard)/billing/payment/page.js",
+  "/(dashboard)/billing/get-final/page": "app/(dashboard)/billing/get-final/page.js",
+  "/(dashboard)/billing/create-final/page": "app/(dashboard)/billing/create-final/page.js",
+  "/(dashboard)/patients/transfer/page": "app/(dashboard)/patients/transfer/page.js"
+}
