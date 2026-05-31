@@ -25,7 +25,7 @@ const AddRoomType = () => {
     const payload = {
       name: formData.name,
       describe: formData.describe,
-      clinic_id: "clinic001", // Replace with actual clinic ID as needed
+      // clinic_id: "clinic001", // Replace with actual clinic ID as needed
     };
 
     console.log("Adding Room Type - Payload:", payload);

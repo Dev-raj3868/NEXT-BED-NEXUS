@@ -94,6 +94,8 @@ const GetRoom = () => {
         axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`,{}, { withCredentials: true }),
         axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, { clinic_id: CLINIC_ID }, { withCredentials: true })
       ]);
+      console.log("Floors Response:", fRes.data);
+      console.log("Departments Response:", dRes.data);
       if (fRes.data.resSuccess === 1) setFloors(fRes.data.data);
       if (dRes.data.resSuccess === 1) setDepartments(dRes.data.data);
     } catch (err) { console.error("Master data fetch error", err); }

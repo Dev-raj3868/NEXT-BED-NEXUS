@@ -21,6 +21,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "ignoreDeprecations": "6.0",
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
@@ -32,7 +33,7 @@
       }
     ],
     "incremental": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
   },
   "include": [
     "next-env.d.ts",

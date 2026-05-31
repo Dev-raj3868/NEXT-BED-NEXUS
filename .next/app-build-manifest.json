@@ -6,30 +6,45 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
+    "/(auth)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/layout.js"
+    ],
+    "/(auth)/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/login/page.js"
+    ],
     "/(dashboard)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
     ],
-    "/(dashboard)/billing/payment/page": [
+    "/(dashboard)/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/payment/page.js"
+      "static/chunks/app/(dashboard)/dashboard/page.js"
     ],
-    "/(dashboard)/billing/get-final/page": [
+    "/(dashboard)/ipd/rooms/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/get-final/page.js"
+      "static/chunks/app/(dashboard)/ipd/rooms/page.js"
     ],
-    "/(dashboard)/billing/create-final/page": [
+    "/(dashboard)/ipd/add-ot-room/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/billing/create-final/page.js"
+      "static/chunks/app/(dashboard)/ipd/add-ot-room/page.js"
     ],
-    "/(dashboard)/patients/transfer/page": [
+    "/(dashboard)/ipd/floors/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/patients/transfer/page.js"
+      "static/chunks/app/(dashboard)/ipd/floors/page.js"
     ]
   }
 }
