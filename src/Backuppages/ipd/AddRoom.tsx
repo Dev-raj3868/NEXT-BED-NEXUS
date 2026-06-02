@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const AddRoom = () => {
   const { toast } = useToast();
+  const CLINIC_ID = "clinic001";
+  const [floors, setFloors] = useState<{ _id: string; floor_name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
   const [formData, setFormData] = useState({
     floorId: "",
     department: "",
@@ -23,6 +27,24 @@ const AddRoom = () => {
     ratePerDay: "",
     amenities: "",
   });
+
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        const [floorRes, deptRes] = await Promise.all([
+          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
+          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
+        ]);
+
+        if (floorRes.data.resSuccess === 1) setFloors(floorRes.data.data || []);
+        if (deptRes.data.resSuccess === 1) setDepartments(deptRes.data.data || []);
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+      }
+    };
+
+    fetchMasterData();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +86,11 @@ const AddRoom = () => {
                     <SelectValue placeholder="Select floor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FL001">Ground Floor</SelectItem>
-                    <SelectItem value="FL002">First Floor</SelectItem>
-                    <SelectItem value="FL003">Second Floor</SelectItem>
+                    {floors.map((floor) => (
+                      <SelectItem key={floor._id} value={floor._id}>
+                        {floor.floor_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -81,10 +105,11 @@ const AddRoom = () => {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiology">Cardiology</SelectItem>
-                    <SelectItem value="neurology">Neurology</SelectItem>
-                    <SelectItem value="orthopedics">Orthopedics</SelectItem>
-                    <SelectItem value="general">General Medicine</SelectItem>
+                    {departments.map((department) => (
+                      <SelectItem key={department._id} value={department._id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

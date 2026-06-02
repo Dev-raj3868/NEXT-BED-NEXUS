@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -91,6 +92,8 @@ const mockPatients = [
 const PAGE_SIZE = 5;
 
 const TransferPatient = () => {
+  const CLINIC_ID = "clinic001";
+
   /* ---------------- SEARCH INPUTS ---------------- */
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
@@ -113,6 +116,9 @@ const TransferPatient = () => {
     useState<(typeof mockPatients)[0] | null>(null);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
 
+  const [floors, setFloors] = useState<{ _id: string; floor_name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
+
   /* ---------------- TRANSFER FORM ---------------- */
   const [transferData, setTransferData] = useState({
     floor: "",
@@ -124,6 +130,24 @@ const TransferPatient = () => {
     transferReason: "",
     transferDate: "",
   });
+
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        const [floorRes, deptRes] = await Promise.all([
+          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
+          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
+        ]);
+
+        if (floorRes.data.resSuccess === 1) setFloors(floorRes.data.data || []);
+        if (deptRes.data.resSuccess === 1) setDepartments(deptRes.data.data || []);
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+      }
+    };
+
+    fetchMasterData();
+  }, []);
 
   /* ---------------- SEARCH ---------------- */
   const handleSearch = () => {
@@ -331,9 +355,11 @@ const TransferPatient = () => {
                     <SelectValue placeholder="Select floor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Floor 1</SelectItem>
-                    <SelectItem value="2">Floor 2</SelectItem>
-                    <SelectItem value="3">Floor 3</SelectItem>
+                    {floors.map((floor) => (
+                      <SelectItem key={floor._id} value={floor._id}>
+                        {floor.floor_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -370,9 +396,11 @@ const TransferPatient = () => {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiology">Cardiology</SelectItem>
-                    <SelectItem value="orthopedics">Orthopedics</SelectItem>
-                    <SelectItem value="neurology">Neurology</SelectItem>
+                    {departments.map((department) => (
+                      <SelectItem key={department._id} value={department._id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

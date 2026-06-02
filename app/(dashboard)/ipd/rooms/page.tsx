@@ -42,7 +42,7 @@ import { Loader2, Edit2, Save } from "lucide-react";
 
 interface Room {
   _id: string;
-  floor_name: string;
+  floor: string;
   floor_id?: string;
   department_name: string;
   department_id?: string;
@@ -80,6 +80,7 @@ const GetRoom = () => {
         { clinic_id: CLINIC_ID },
         { withCredentials: true }
       );
+      console.log("Rooms response:", response.data);
       if (response.data.resSuccess === 1) setRooms(response.data.data || []);
     } catch (error) {
       console.error("Error fetching rooms:", error);
@@ -126,12 +127,16 @@ const GetRoom = () => {
     
     // Find the department name for the selected ID
     const dept = departments.find(d => d._id === editFormData.department_id);
+    const selectedFloor = floors.find((f) => f._id === editFormData.floor_id);
+
+    console.log(selectedFloor, floors)
 
     try {
       const payload = {
         room_id: selectedRoom._id,
         hospital_id: CLINIC_ID,
         ...editFormData,
+        floor: selectedFloor?.floor_name || selectedRoom.floor,
         department_name: dept?.name || selectedRoom.department_name,
         rate_per_day: Number(editFormData.rate_per_day)
       };
@@ -194,7 +199,7 @@ const GetRoom = () => {
                   {currentRooms.map((room) => (
                     <TableRow key={room._id}>
                       <TableCell className="font-medium">{room.room_number}</TableCell>
-                      <TableCell>{room.floor_name || "N/A"}</TableCell>
+                      <TableCell>{room.floor || "N/A"}</TableCell>
                       <TableCell>{room.department_name}</TableCell>
                       <TableCell className="capitalize">{room.room_category.replace(/-/g, ' ')}</TableCell>
                       <TableCell>₹{room.rate_per_day?.toLocaleString()}</TableCell>

@@ -225,7 +225,7 @@ const TransferPatient = () => {
     const fetchBaseData = async () => {
       try {
         const [floorRes, deptRes, roomRes] = await Promise.all([
-          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, {}, { withCredentials: true }),
+          axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
           axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
           axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_rooms`, { clinic_id: CLINIC_ID }, { withCredentials: true })
         ]);
@@ -350,7 +350,8 @@ const TransferPatient = () => {
         new_bed_id: transferData.bed,
         new_room_id: transferData.room,
         new_room_name: selectedRoomObj?.room_number || undefined,
-        new_floor: selectedFloorObj?._id || transferData.floor,
+        new_floor_id: selectedFloorObj?._id || transferData.floor,
+        new_floor: selectedFloorObj?.floor_name || "",
         new_department: transferData.department,
         new_room_type: transferData.roomType,
         new_daily_rate: transferData.dailyRate ? Number(transferData.dailyRate) : undefined,

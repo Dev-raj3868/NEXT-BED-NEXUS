@@ -19,15 +19,11 @@ import { Loader2 } from "lucide-react";
 
 const AddRoom = () => {
   const { toast } = useToast();
+  const CLINIC_ID = "clinic001";
   const [loading, setLoading] = useState(false);
-  const mockDeps = [
-
-    { _id: "695bb7de67fbc7ab32baacdf", name: "ICU" },
-    { _id: "695bb7de67fbc7ab32baacde", name: "Cardiology" },
-  ];
   
   const [floors, setFloors] = useState<{ _id: string; floor_name: string }[]>([]);
-  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>(mockDeps);
+  const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
 
   const [formData, setFormData] = useState({
     floorId: "",
@@ -43,7 +39,7 @@ const AddRoom = () => {
     const fetchFloors = async () => {
       try {
         const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, {
-          clinic_id: "clinic123",
+          clinic_id: CLINIC_ID,
         }, {
           withCredentials: true
         });
@@ -57,7 +53,7 @@ const AddRoom = () => {
     const fetchDepartments = async () => {
       try {
         const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, {
-          clinic_id: "clinic001",
+          clinic_id: CLINIC_ID,
         }, {
           withCredentials: true
         });
@@ -78,16 +74,18 @@ const AddRoom = () => {
     setLoading(true);
 
     const selectedDept = departments.find(d => d._id === formData.departmentId);
+    const selectedFloor = floors.find(f => f._id === formData.floorId);
 
     const payload = {
       floor_id: formData.floorId,
+      floor: selectedFloor?.floor_name || "",
       room_category: formData.roomCategory,
       department_id: formData.departmentId,
       department_name: selectedDept?.name || "",
       room_number: formData.roomNumber,
       rate_per_day: Number(formData.ratePerDay),
       amenities: formData.amenities.split(",").map(item => item.trim()).filter(item => item !== ""),
-      clinic_id: "clinic123",
+      // clinic_id: "clinic123",
     };
 
     console.log("Submitting Room Data:", payload);

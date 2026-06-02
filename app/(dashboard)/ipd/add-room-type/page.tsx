@@ -15,7 +15,7 @@ const AddRoomType = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    describe: "",
+    description: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,7 +24,7 @@ const AddRoomType = () => {
 
     const payload = {
       name: formData.name,
-      describe: formData.describe,
+      description: formData.description,
       // clinic_id: "clinic001", // Replace with actual clinic ID as needed
     };
 
@@ -44,7 +44,7 @@ const AddRoomType = () => {
           title: "Room Type Added",
           description: `Room type "${formData.name}" has been added successfully.`,
         });
-        setFormData({ name: "", describe: "" }); // Reset form
+        setFormData({ name: "", description: "" }); // Reset form
       } else {
         toast({
           variant: "destructive",
@@ -90,12 +90,12 @@ const AddRoomType = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="describe">Description</Label>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="describe"
+                id="description"
                 placeholder="Enter description here..."
-                value={formData.describe}
-                onChange={(e) => setFormData({ ...formData, describe: e.target.value })}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="min-h-[100px]"
                 disabled={loading}
               />

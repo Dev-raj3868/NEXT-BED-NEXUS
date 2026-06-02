@@ -134,6 +134,8 @@ const CreateAdmission = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    const selectedFloor = floors.find((f) => f._id === bedInfo.floor);
     const payload = {
       patient_id: patientInfo.patientId,
       global_id: patientInfo.globalId,
@@ -156,7 +158,8 @@ const CreateAdmission = () => {
       bed_id: bedInfo.bedId,
       room_id: bedInfo.roomId,
       room_name: bedInfo.roomName,
-      floor: bedInfo.floor,
+      floor_id: bedInfo.floor,
+      floor: selectedFloor?.floor_name || "",
       department: bedInfo.department,
       room_type: bedInfo.roomType,
       room_rate: Number(bedInfo.roomRate),

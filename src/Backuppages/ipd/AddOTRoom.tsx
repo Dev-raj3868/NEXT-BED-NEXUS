@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 
 const AddOTRoom = () => {
+  const CLINIC_ID = "clinic001";
+  const [floors, setFloors] = useState<{ _id: string; floor_name: string }[]>([]);
   const [formData, setFormData] = useState({
     otName: "",
     floor: "",
@@ -14,6 +17,26 @@ const AddOTRoom = () => {
     costPerHour: "",
     status: "",
   });
+
+  useEffect(() => {
+    const fetchFloors = async () => {
+      try {
+        const response = await axios.post(
+          `${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`,
+          { clinic_id: CLINIC_ID },
+          { withCredentials: true }
+        );
+
+        if (response.data.resSuccess === 1) {
+          setFloors(response.data.data || []);
+        }
+      } catch (error) {
+        console.error("Error fetching floors:", error);
+      }
+    };
+
+    fetchFloors();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,10 +88,11 @@ const AddOTRoom = () => {
                   <SelectValue placeholder="Select floor" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Floor 1</SelectItem>
-                  <SelectItem value="2">Floor 2</SelectItem>
-                  <SelectItem value="3">Floor 3</SelectItem>
-                  <SelectItem value="4">Floor 4</SelectItem>
+                  {floors.map((floor) => (
+                    <SelectItem key={floor._id} value={floor._id}>
+                      {floor.floor_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
