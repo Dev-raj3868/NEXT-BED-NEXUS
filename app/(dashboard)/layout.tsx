@@ -4,38 +4,15 @@ import Sidebar from "@/components/layout/Sidebar";
 import { Bell, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useBedManagementAuth } from "@/components/auth/bed-management-auth-provider";
+import { logoutBedManagementAdmin } from "@/lib/bed-management-auth";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const { admin, isAuthenticated, isHydrated, signOut } = useBedManagementAuth();
-  console.log("Admin:", admin);
-
-  useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, isHydrated, router]);
-
-  if (!isHydrated || !isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="rounded-2xl border bg-card px-6 py-5 shadow-card text-sm text-muted-foreground">
-          Loading your dashboard...
-        </div>
-      </div>
-    );
-  }
-
-  const handleLogout = () => {
-    signOut();
-    router.replace("/login");
+  const handleLogout = async () => {
+    await logoutBedManagementAdmin();
   };
 
   return (
@@ -63,8 +40,8 @@ export default function DashboardLayout({
             <div className="hidden md:flex items-center gap-2 rounded-full border bg-background px-3 py-1.5">
               <User className="w-4 h-4 text-muted-foreground" />
               <div className="text-left">
-                <p className="text-sm font-medium text-foreground leading-none">{admin?.name || "Bed Admin"}</p>
-                <p className="text-xs text-muted-foreground leading-none mt-1">{admin?.clinic_id || "Clinic ID"}</p>
+                <p className="text-sm font-medium text-foreground leading-none">Bed Admin</p>
+                <p className="text-xs text-muted-foreground leading-none mt-1">Admin Profile</p>
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">

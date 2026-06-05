@@ -17,7 +17,6 @@ import {
   getBedManagementAuthErrorMessage,
   signupBedManagementAdmin,
 } from "@/lib/bed-management-auth";
-import { useBedManagementAuth } from "@/components/auth/bed-management-auth-provider";
 
 const signupSchema = z.object({
   hospital_id: z.string().trim().min(1, "Hospital ID is required."),
@@ -43,7 +42,6 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { signIn } = useBedManagementAuth();
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -57,11 +55,10 @@ export default function SignupPage() {
 
   const handleSignup = async (values: SignupFormValues) => {
     try {
-      const session = await signupBedManagementAdmin(values);
-      signIn(session);
+      const response = await signupBedManagementAdmin(values);
       toast({
         title: "Account created",
-        description: `Bed management admin access is ready${session.admin.name ? ` for ${session.admin.name}` : ""}.`,
+        description: `Bed management admin access is ready${response?.admin?.name ? ` for ${response.admin.name}` : ""}.`,
       });
       router.replace("/dashboard");
     } catch (error) {

@@ -18,7 +18,6 @@ import {
   loginBedManagementAdmin,
 } from "@/lib/bed-management-auth";
 import type { BedManagementLoginInput } from "@/lib/bed-management-auth";
-import { useBedManagementAuth } from "@/components/auth/bed-management-auth-provider";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -30,7 +29,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { signIn } = useBedManagementAuth();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -41,11 +39,10 @@ export default function LoginPage() {
 
   const handleLogin: SubmitHandler<LoginFormValues> = async (values) => {
     try {
-      const session = await loginBedManagementAdmin(values as BedManagementLoginInput);
-      signIn(session);
+      const response = await loginBedManagementAdmin(values as BedManagementLoginInput);
       toast({
         title: "Signed in successfully",
-        description: `Welcome back${session.admin.name ? `, ${session.admin.name}` : ""}.`,
+        description: `Welcome back${response?.admin?.name ? `, ${response.admin.name}` : ""}.`,
       });
       router.replace("/dashboard");
     } catch (error) {

@@ -1,8 +1,0 @@
-{
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/ipd/beds/page": "app/(dashboard)/ipd/beds/page.js",
-  "/(dashboard)/ipd/room-types/page": "app/(dashboard)/ipd/room-types/page.js",
-  "/(dashboard)/ipd/rooms/page": "app/(dashboard)/ipd/rooms/page.js",
-  "/(dashboard)/ipd/ot-rooms/page": "app/(dashboard)/ipd/ot-rooms/page.js"
-}

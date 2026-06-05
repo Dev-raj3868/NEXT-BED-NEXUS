@@ -200,13 +200,13 @@ const TransferPatient = () => {
         : { patient_name: query, clinic_id: "clinic001" };
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`,
         payload,
         { withCredentials: true }
       );
 
       if (response.data.resSuccess === 1) {
-        // console.log("Response", response.data);
+        console.log("Response", response.data);
         if (type === 'phone') {
           setPhoneSuggestions(response.data.data || []);
           setShowPhoneDropdown(true);
@@ -346,7 +346,7 @@ const TransferPatient = () => {
 
       const payload: any = {
         admission_id: selectedAdmissionId || selectedPatient.admission_id || undefined,
-        transfer_id: `TRF-${Date.now()}`,
+        transfer_id: searchAdmissionId || selectedPatient.admission_id || undefined,
         new_bed_id: transferData.bed,
         new_room_id: transferData.room,
         new_room_name: selectedRoomObj?.room_number || undefined,
@@ -357,7 +357,7 @@ const TransferPatient = () => {
         new_daily_rate: transferData.dailyRate ? Number(transferData.dailyRate) : undefined,
         transfer_reason: transferData.transferReason,
         transfer_date: transferData.transferDate ? new Date(transferData.transferDate).toISOString() : new Date().toISOString(),
-        authorized_by: "SYSTEM",
+        // authorized_by: "SYSTEM",
         transferred_by: "CURRENT_USER",
         patient_id: selectedPatientId || undefined,
       };
@@ -373,6 +373,7 @@ const TransferPatient = () => {
         setSelectedAdmissionId("");
         setTransferData({ floor: "", room: "", bed: "", department: "", roomType: "", dailyRate: "", transferReason: "", transferDate: "" });
       } else {
+        console.error('Transfer failed:', res);
         toast({ title: 'Transfer failed', description: res.data.message || 'Unexpected response from server', variant: 'destructive' } as any);
       }
     } catch (err) {
@@ -445,7 +446,8 @@ const TransferPatient = () => {
                       onClick={() => {
                         setSearchName(p.patient_name);
                         setSearchPhone(p.phone_number);
-                        setSelectedPatientId(p._id);
+                        setSelectedPatientId(p.patient_id);
+                        setSearchAdmissionId(p.admission_id);
                         setSelectedPatient(p);
                         setShowNameDropdown(false);
                       }}
@@ -474,7 +476,8 @@ const TransferPatient = () => {
                       onClick={() => {
                         setSearchPhone(p.phone_number);
                         setSearchName(p.patient_name);
-                        setSelectedPatientId(p._id);
+                        setSelectedPatientId(p.patient_id);
+                        setSearchAdmissionId(p.admission_id);
                         setSelectedPatient(p);
                         setShowPhoneDropdown(false);
                       }}
@@ -589,7 +592,7 @@ const TransferPatient = () => {
 
       {/* Transfer Dialog */}
       <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Transfer Details</DialogTitle>
           </DialogHeader>

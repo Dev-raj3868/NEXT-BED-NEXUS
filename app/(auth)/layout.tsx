@@ -1,44 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useBedManagementAuth } from "@/components/auth/bed-management-auth-provider";
 import { BedDouble, ShieldCheck, Sparkles, Activity } from "lucide-react";
-
-function AuthRedirectGate({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const { isAuthenticated, isHydrated } = useBedManagementAuth();
-
-  useEffect(() => {
-    if (isHydrated && isAuthenticated) {
-      router.replace("/dashboard");
-    }
-  }, [isAuthenticated, isHydrated, router]);
-
-  if (!isHydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="rounded-2xl border bg-card px-6 py-5 shadow-card text-sm text-muted-foreground">
-          Checking your session...
-        </div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="rounded-2xl border bg-card px-6 py-5 shadow-card text-sm text-muted-foreground">
-          Redirecting to the dashboard...
-        </div>
-      </div>
-    );
-  }
-
-  return children;
-}
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -102,7 +67,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
         <div className="flex items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
           <div className="w-full max-w-md">
-            <AuthRedirectGate>{children}</AuthRedirectGate>
+            {children}
           </div>
         </div>
       </div>

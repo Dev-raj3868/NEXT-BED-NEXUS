@@ -1,5 +1,6 @@
 'use client';
 import { useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,18 +14,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, User, Phone, Heart, Crown, CreditCard } from "lucide-react";
+import { UserPlus, User, Phone, Heart, Crown, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const AddPatient = () => {
   const [isVip, setIsVip] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    patient_name: "",
+    phone_number: "",
+    secondary_phone_number: "",
+    age: 0,
+    gender: "",
+    address: "",
+    pin_code: "",
+    email: "",
+    membership_id: "",
+    membership_end_date: "",
+    chronic_disease: "",
+    created_by: "", // Assuming a user ID will be provided or fetched
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Patient Added",
-      description: "Patient information has been saved successfully.",
-    });
+    setIsLoading(true);
+
+    const CLINIC_ID = "clinic001"; // Mock clinic ID
+    const CREATED_BY = "user001"; // Mock user ID
+
+    try {
+      const payload = {
+        clinic_id: CLINIC_ID,
+        patient_name: formData.patient_name,
+        phone_number: formData.phone_number,
+        secondary_phone_number: formData.secondary_phone_number || undefined,
+        age: formData.age || undefined,
+        gender: formData.gender || undefined,
+        address: formData.address || undefined,
+        pin_code: formData.pin_code || undefined,
+        email: formData.email || undefined,
+        membership_id: formData.membership_id || undefined,
+        membership_end_date: formData.membership_end_date || undefined,
+        chronic_disease: formData.chronic_disease || undefined,
+        created_by: CREATED_BY,
+      };
+
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/profile/create-patient-profile`,
+        payload,
+        { withCredentials: true }
+      );
+
+      if (response.data.apiSuccess === 1) {
+        toast({
+          title: "Success",
+          description: response.data.message || "Patient profile created successfully",
+        });
+        // Optionally reset form
+        setFormData({
+          patient_name: "",
+          phone_number: "",
+          secondary_phone_number: "",
+          age: 0,
+          gender: "",
+          address: "",
+          pin_code: "",
+          email: "",
+          membership_id: "",
+          membership_end_date: "",
+          chronic_disease: "",
+          created_by: "", // Assuming a user ID will be provided or fetched
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.data.message || "Failed to create patient profile",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error creating patient profile:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "An error occurred while creating the profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -52,50 +129,96 @@ const AddPatient = () => {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="patient_name">Patient Name *</Label>
-              <Input id="patient_name" placeholder="Enter full name" required />
+              <Input
+                id="patient_name"
+                placeholder="Enter full name"
+                required
+                value={formData.patient_name}
+                onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number *</Label>
-              <Input id="phone" type="tel" placeholder="Enter phone number" required />
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="Enter phone number"
+                required
+                value={formData.phone_number}
+                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="age">Age *</Label>
-              <Input id="age" type="number" placeholder="Enter age" min="0" max="150" required />
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                placeholder="Enter age"
+                min="0"
+                max="150"
+                value={formData.age === 0 ? "" : formData.age}
+                onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gender">Gender *</Label>
-              <Select required>
+              <Label htmlFor="gender">Gender</Label>
+              <Select
+                value={formData.gender}
+                onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="address">Address</Label>
-              <Input id="address" placeholder="Enter full address" />
+              <Input
+                id="address"
+                placeholder="Enter full address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pin_code">Pin Code</Label>
-              <Input id="pin_code" placeholder="Enter pin code" />
+              <Input
+                id="pin_code"
+                placeholder="Enter pin code"
+                value={formData.pin_code}
+                onChange={(e) => setFormData({ ...formData, pin_code: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="Enter email address" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter email address"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone2">Secondary Phone</Label>
-              <Input id="phone2" type="tel" placeholder="Enter alternate number" />
+              <Input
+                id="phone2"
+                type="tel"
+                placeholder="Enter alternate number"
+                value={formData.secondary_phone_number}
+                onChange={(e) => setFormData({ ...formData, secondary_phone_number: e.target.value })}
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Emergency Contact Section */}
-        <Card className="border-l-4 border-l-destructive">
+        {/* <Card className="border-l-4 border-l-destructive">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Phone className="w-5 h-5 text-destructive" />
@@ -128,7 +251,7 @@ const AddPatient = () => {
               <Input id="emergency_phone" type="tel" placeholder="Emergency phone" required />
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Other Info Section */}
         <Card className="border-l-4 border-l-accent">
@@ -141,7 +264,12 @@ const AddPatient = () => {
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="chronic_disease">Chronic Diseases</Label>
-              <Input id="chronic_disease" placeholder="e.g., Diabetes, Hypertension" />
+              <Input
+                id="chronic_disease"
+                placeholder="e.g., Diabetes, Hypertension"
+                value={formData.chronic_disease}
+                onChange={(e) => setFormData({ ...formData, chronic_disease: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="blood_group">Blood Group</Label>
@@ -172,8 +300,38 @@ const AddPatient = () => {
           </CardContent>
         </Card>
 
+        {/* Membership Information Section */}
+        <Card className="border-l-4 border-l-info">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="w-5 h-5 text-info" />
+              Membership Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="membership_id">Membership ID</Label>
+              <Input
+                id="membership_id"
+                placeholder="Enter membership ID"
+                value={formData.membership_id}
+                onChange={(e) => setFormData({ ...formData, membership_id: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="membership_end_date">Membership End Date</Label>
+              <Input
+                id="membership_end_date"
+                type="date"
+                value={formData.membership_end_date}
+                onChange={(e) => setFormData({ ...formData, membership_end_date: e.target.value })}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* VIP Section */}
-        <Card className="border-l-4 border-l-warning">
+        {/* <Card className="border-l-4 border-l-warning">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Crown className="w-5 h-5 text-warning" />
@@ -205,10 +363,10 @@ const AddPatient = () => {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Billing Preferences Section */}
-        <Card className="border-l-4 border-l-primary">
+        {/* <Card className="border-l-4 border-l-primary">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
               <CreditCard className="w-5 h-5 text-primary" />
@@ -243,14 +401,18 @@ const AddPatient = () => {
               </Select>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline">Cancel</Button>
-          <Button type="submit" variant="gradient" className="px-8">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add Patient
+          <Button type="button" variant="outline" disabled={isLoading}>Cancel</Button>
+          <Button type="submit" variant="gradient" className="px-8" disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <UserPlus className="w-4 h-4 mr-2" />
+            )}
+            {isLoading ? "Adding..." : "Add Patient"}
           </Button>
         </div>
       </form>
