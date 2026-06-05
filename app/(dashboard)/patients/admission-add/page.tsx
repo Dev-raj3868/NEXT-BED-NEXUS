@@ -42,7 +42,7 @@ const CreateAdmission = () => {
   const [patientInfo, setPatientInfo] = useState({
     phoneNumber: "",
     patientId: "",
-    globalId: "",
+    // globalId: "",
     patientName: "",
     emergencyContactName: "",
     emergencyContactNumber: "",
@@ -138,7 +138,7 @@ const CreateAdmission = () => {
     const selectedFloor = floors.find((f) => f._id === bedInfo.floor);
     const payload = {
       patient_id: patientInfo.patientId,
-      global_id: patientInfo.globalId,
+      // global_id: patientInfo.globalId,
       admission_date: admissionInfo.admissionDate ? new Date(admissionInfo.admissionDate).toISOString() : null,
       admission_time: admissionInfo.admissionTime,
       admission_type: admissionInfo.admissionType,
@@ -154,21 +154,23 @@ const CreateAdmission = () => {
       emergency_contact_number: patientInfo.emergencyContactNumber,
       advance_Payment: Number(admissionInfo.advancePayment),
       remark: bedInfo.remark,
-      created_by: "STAFF-456",
+      // created_by: "STAFF-456",
       bed_id: bedInfo.bedId,
       room_id: bedInfo.roomId,
       room_name: bedInfo.roomName,
       floor_id: bedInfo.floor,
-      floor: selectedFloor?.floor_name || "",
+      // floor: selectedFloor?.floor_name || "",
       department: bedInfo.department,
       room_type: bedInfo.roomType,
       room_rate: Number(bedInfo.roomRate),
       date_in: bedInfo.dateIn ? new Date(bedInfo.dateIn).toISOString() : null,
       assignment_type: bedInfo.assignmentType,
       daily_rate: Number(bedInfo.dailyRate),
-      authorized_by: "DR-123",
-      clinic_id: CLINIC_ID
+      // authorized_by: "DR-123",
+      // clinic_id: CLINIC_ID
     };
+
+    console.log("Payload:", payload);
 
     try {
       const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/admissionAndBeds/create_admission`,
@@ -177,7 +179,17 @@ const CreateAdmission = () => {
           withCredentials: true
         });
         console.log("Create Admission Response:", res.data);
-      if (res.data.resSuccess === 1) toast({ title: "Admission Created" });
+      if (res.data.resSuccess === 1) {
+        toast({ title: "Admission Created" });
+        // Reset form
+        setPatientInfo({ phoneNumber: "", patientId: "", patientName: "", emergencyContactName: "", emergencyContactNumber: "" });
+        setAdmissionInfo({ admissionDate: "", admissionTime: "", admissionType: "", reasonForAdmission: "", estimatedDischargeDate: "", advancePayment: "" });
+        setBedInfo({ doctorName: "", specialization: "", remark: "", bedId: "", roomId: "", roomName: "", floor: "", department: "", roomType: "", roomRate: "", dateIn: "", assignmentType: "Admission", dailyRate: "" });
+        setPhoneSuggestions([]);
+        setNameSuggestions([]);
+        setShowNameDropdown(false);
+        setShowPhoneDropdown(false);
+      }
     } catch (error) { 
       toast({ title: "Error", variant: "destructive" });
     }
@@ -205,7 +217,7 @@ const CreateAdmission = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2 relative">
-                <Label>Phone Number</Label>
+                <Label>Phone Number*</Label>
                 <Input value={isExistingPatient ? searchPhone : patientInfo.phoneNumber} onChange={(e) => {
                   const v = e.target.value;
                   isExistingPatient ? setSearchPhone(v) : setPatientInfo({...patientInfo, phoneNumber: v});
@@ -215,7 +227,8 @@ const CreateAdmission = () => {
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-auto">
                     {phoneSuggestions.map(p => (
                       <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-sm" onClick={() => {
-                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, globalId: p.global_id || p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" });
+                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" 
+                          });
                         setSearchPhone(p.phone_number); setSearchName(p.patient_name); setShowPhoneDropdown(false);
                       }}>{p.phone_number} - {p.patient_name}</div>
                     ))}
@@ -223,7 +236,7 @@ const CreateAdmission = () => {
                 )}
               </div>
               <div className="space-y-2 relative">
-                <Label>Patient Name</Label>
+                <Label>Patient Name*</Label>
                 <Input value={isExistingPatient ? searchName : patientInfo.patientName} onChange={(e) => {
                   const v = e.target.value;
                   isExistingPatient ? setSearchName(v) : setPatientInfo({...patientInfo, patientName: v});
@@ -233,7 +246,8 @@ const CreateAdmission = () => {
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-auto">
                     {nameSuggestions.map(p => (
                       <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-sm" onClick={() => {
-                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, globalId: p.global_id || p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" });
+                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" 
+                          });
                         setSearchName(p.patient_name); setSearchPhone(p.phone_number); setShowNameDropdown(false);
                       }}>{p.patient_name} ({p.phone_number})</div>
                     ))}
@@ -241,7 +255,7 @@ const CreateAdmission = () => {
                 )}
               </div>
               <div className="space-y-2"><Label>Patient ID</Label><Input value={patientInfo.patientId} readOnly /></div>
-              <div className="space-y-2"><Label>Global ID</Label><Input value={patientInfo.globalId} readOnly /></div>
+              {/* <div className="space-y-2"><Label>Global ID</Label><Input value={patientInfo.globalId} readOnly /></div> */}
               <div className="space-y-2"><Label>Emergency Contact</Label><Input value={patientInfo.emergencyContactName} onChange={(e) => setPatientInfo({...patientInfo, emergencyContactName: e.target.value})} readOnly={isExistingPatient} /></div>
               <div className="space-y-2"><Label>Emergency Number</Label><Input value={patientInfo.emergencyContactNumber} onChange={(e) => setPatientInfo({...patientInfo, emergencyContactNumber: e.target.value})} readOnly={isExistingPatient} /></div>
             </div>
@@ -252,10 +266,10 @@ const CreateAdmission = () => {
         <Card>
           <CardHeader><CardTitle>Admission Info</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Admission Date</Label><Input type="date" value={admissionInfo.admissionDate} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionDate: e.target.value})} /></div>
-            <div className="space-y-2"><Label>Admission Time</Label><Input type="time" value={admissionInfo.admissionTime} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionTime: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Admission Date*</Label><Input type="date" value={admissionInfo.admissionDate} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionDate: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Admission Time*</Label><Input type="time" value={admissionInfo.admissionTime} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionTime: e.target.value})} /></div>
             <div className="space-y-2">
-              <Label>Admission Type</Label>
+              <Label>Admission Type*</Label>
               <Select onValueChange={(v) => setAdmissionInfo({...admissionInfo, admissionType: v})}>
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent><SelectItem value="direct_admission">Direct Admission</SelectItem><SelectItem value="referral">Referral</SelectItem><SelectItem value="transfer">Transfer</SelectItem></SelectContent>

@@ -205,8 +205,8 @@ const TransferPatient = () => {
         { withCredentials: true }
       );
 
+      console.log("Response", response.data);
       if (response.data.resSuccess === 1) {
-        console.log("Response", response.data);
         if (type === 'phone') {
           setPhoneSuggestions(response.data.data || []);
           setShowPhoneDropdown(true);
@@ -289,43 +289,43 @@ const TransferPatient = () => {
   };
 
   /* ---------------- FILTER ---------------- */
-  const filteredPatients = mockPatients.filter((patient) => {
-    const matchesName = patient.patient_name
-      .toLowerCase()
-      .includes(filters.name.toLowerCase());
+  // const filteredPatients = mockPatients.filter((patient) => {
+  //   const matchesName = patient.patient_name
+  //     .toLowerCase()
+  //     .includes(filters.name.toLowerCase());
 
-    const matchesPhone = patient.phone_number.includes(filters.phone);
+  //   const matchesPhone = patient.phone_number.includes(filters.phone);
 
-    const matchesAdmissionId = patient.admission_id
-      .toLowerCase()
-      .includes(filters.admissionId.toLowerCase());
+  //   const matchesAdmissionId = patient.admission_id
+  //     .toLowerCase()
+  //     .includes(filters.admissionId.toLowerCase());
 
-    const matchesDate = filters.admissionDate
-      ? patient.admission_date === filters.admissionDate
-      : true;
+  //   const matchesDate = filters.admissionDate
+  //     ? patient.admission_date === filters.admissionDate
+  //     : true;
 
-    return matchesName && matchesPhone && matchesAdmissionId && matchesDate;
-  });
+  //   return matchesName && matchesPhone && matchesAdmissionId && matchesDate;
+  // });
 
   /* ---------------- PAGINATION ---------------- */
   // when searched we display admissions fetched from API; otherwise show filtered mock patients
-  const totalPages = Math.ceil((hasSearched ? admissions.length : filteredPatients.length) / PAGE_SIZE);
+  const totalPages = Math.ceil((admissions.length) / PAGE_SIZE);
 
-  const paginatedPatients = (hasSearched ? admissions : filteredPatients).slice(
+  const paginatedPatients = (admissions ).slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
 
   /* ---------------- ACTIONS ---------------- */
-  const handleTransferClick = (patient: (typeof mockPatients)[0]) => {
-    setSelectedPatient(patient);
-    // if patient object contains an id usable for API, set it and fetch admissions
-    if ((patient as any)._id) {
-      setSelectedPatientId((patient as any)._id);
-      fetchPatientAdmissions((patient as any)._id);
-    }
-    setShowTransferDialog(true);
-  };
+  // const handleTransferClick = (patient: (typeof mockPatients)[0]) => {
+  //   setSelectedPatient(patient);
+  //   // if patient object contains an id usable for API, set it and fetch admissions
+  //   if ((patient as any)._id) {
+  //     setSelectedPatientId((patient as any)._id);
+  //     fetchPatientAdmissions((patient as any)._id);
+  //   }
+  //   setShowTransferDialog(true);
+  // };
 
   const handleSubmitTransfer = async () => {
     // basic validation
@@ -342,11 +342,14 @@ const TransferPatient = () => {
     try {
       const selectedRoomObj = rooms.find(r => r._id === transferData.room);
       const selectedFloorObj = floors.find(f => f._id === transferData.floor);
-      console.log("Selected admission:", selectedPatient)
+      console.log("Selected admission:", selectedPatient);
+
+      const selectedAdmission = admissions.find(a => (a._id === selectedAdmissionId || a.admission_id === selectedAdmissionId));
+
 
       const payload: any = {
         admission_id: selectedAdmissionId || selectedPatient.admission_id || undefined,
-        transfer_id: searchAdmissionId || selectedPatient.admission_id || undefined,
+        transfer_id: selectedAdmission?.last_transfer_id || undefined,
         new_bed_id: transferData.bed,
         new_room_id: transferData.room,
         new_room_name: selectedRoomObj?.room_number || undefined,
