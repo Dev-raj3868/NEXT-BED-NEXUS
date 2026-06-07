@@ -15,10 +15,11 @@ import {
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { billingPost, CLINIC_ID, getBillingMessage } from '../billing-api';
 
 interface PaymentForm {
-  hospital_id: string;
   bill_id: string;
+  final_bill_id: string;
   admission_id: string;
   patient_id: string;
   amount_paid: number;
@@ -30,13 +31,12 @@ interface PaymentForm {
 }
 
 export default function PaymentPage() {
-  const CLINIC_ID = "clinic001";
   const nameRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<PaymentForm>({
-    hospital_id: CLINIC_ID,
     bill_id: '',
+    final_bill_id: '',
     admission_id: '',
     patient_id: '',
     amount_paid: 0,
@@ -127,22 +127,50 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.bill_id && !formData.final_bill_id) {
+      toast({ title: "Invalid payment", description: "Enter a Bill ID or Final Bill ID.", variant: "destructive" });
+      return;
+    }
+    if (formData.amount_paid <= 0) {
+      toast({ title: "Invalid payment", description: "Payment amount must be greater than 0.", variant: "destructive" });
+      return;
+    }
+    if (!formData.payment_method) {
+      toast({ title: "Invalid payment", description: "Select a payment method.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/billing/add_payment`,
-        formData, { withCredentials: true }
-      );
-      console.log("Payment API response", response.data);
-      if (response.data.resSuccess === 1) {
-        toast({ title: "Success", description: "Payment recorded successfully" });
+      const response = await billingPost("add_payment", {
+        bill_id: formData.bill_id || undefined,
+        final_bill_id: formData.final_bill_id || undefined,
+        admission_id: formData.admission_id || undefined,
+        patient_id: formData.patient_id || undefined,
+        amount_paid: formData.amount_paid,
+        payment_method: formData.payment_method,
+        transaction_id: formData.reference_id || undefined,
+        received_by: formData.created_by || undefined,
+        date: new Date().toISOString().slice(0, 10),
+        notes: formData.payment_notes || undefined,
+        payment_type: formData.payment_type || undefined,
+      });
+
+      if (response.apiSuccess === 1) {
+        toast({ title: "Success", description: response.message || "Payment recorded successfully." });
         setFormData({
-          hospital_id: CLINIC_ID, bill_id: '', admission_id: '', patient_id: '',
+          bill_id: '', final_bill_id: '', admission_id: '', patient_id: '',
           amount_paid: 0, payment_method: '', reference_id: '',
           payment_notes: '', payment_type: '', created_by: 'RECEPTIONIST_001',
         });
         setSearchName(""); setSearchPhone("");
       } else {
-        toast({ title: "Error", description: response.data.message, variant: "destructive" });
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "Invalid payment",
+          description: getBillingMessage(response, "Unable to record payment."),
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({ title: "Error", description: "Server Error", variant: "destructive" });
@@ -214,7 +242,12 @@ export default function PaymentPage() {
 
               <div className="space-y-2">
                 <Label>Bill ID</Label>
-                <Input value={formData.bill_id} onChange={(e) => handleChange('bill_id', e.target.value)} placeholder="Enter Bill ID" required />
+                <Input value={formData.bill_id} onChange={(e) => handleChange('bill_id', e.target.value)} placeholder="Enter Bill ID" />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Final Bill ID</Label>
+                <Input value={formData.final_bill_id} onChange={(e) => handleChange('final_bill_id', e.target.value)} placeholder="Optional final bill ID" />
               </div>
 
               <div className="space-y-2">

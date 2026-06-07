@@ -14,10 +14,24 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
+// Interface matching the backend response structure
+interface OTRoom {
+  _id: string;
+  ot_name: string;
+  floor?: string;
+  cost_per_hour?: number;
+  cost_per_day?: number;
+  status: string;
+}
+
 const AddOTSlot = () => {
-  const CLINIC_ID = "clinic001";
+  const CLINIC_ID = "clinic001"; 
   const [loading, setLoading] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(true);
   
+  /* ---------------- DYNAMIC DATA STATES ---------------- */
+  const [otRooms, setOtRooms] = useState<OTRoom[]>([]);
+
   /* ---------------- FORM STATE ---------------- */
   const [formData, setFormData] = useState({
     admissionId: "",
@@ -39,20 +53,48 @@ const AddOTSlot = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  /* ---------------- FETCH OPERATING THEATRES ---------------- */
+  useEffect(() => {
+    const fetchOTRooms = async () => {
+      try {
+        setLoadingRooms(true);
+        // Pointing to your getOtRoomsTable endpoint routing architecture
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/ot-modules/get_ot_rooms`, {
+          hospital_id: CLINIC_ID
+        }, { withCredentials: true });
+        console.log("Fetched OT Rooms:", res.data);
+        if (res.data.resSuccess === 1 && Array.isArray(res.data.data)) {
+          // Filter out inactive rooms optionally, or display all
+          setOtRooms(res.data.data);
+        } else {
+          console.error("Failed to parse dynamic OTs:", res.data.message);
+        }
+      } catch (err) {
+        console.error("Error fetching dynamic OT rooms:", err);
+      } finally {
+        setLoadingRooms(false);
+      }
+    };
+
+    fetchOTRooms();
+  }, [CLINIC_ID]);
+
   /* ---------------- SEARCH PATIENTS ---------------- */
   useEffect(() => {
     const getSuggestions = async () => {
       if (formData.patientName.length < 3) return;
       try {
-        const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/profile/name-suggestion-patient-information`, {
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`, {
           patient_name: formData.patientName,
-          clinic_id: CLINIC_ID
         }, { withCredentials: true });
+        
         if (res.data.resSuccess === 1) {
           setSuggestions(res.data.data);
           setShowSuggestions(true);
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+        console.error(err); 
+      }
     };
     const timeout = setTimeout(getSuggestions, 500);
     return () => clearTimeout(timeout);
@@ -70,21 +112,20 @@ const AddOTSlot = () => {
 
     const payload = {
       booking_id: `OTB-${format(new Date(), "yyyyMMdd")}-${Math.floor(1000 + Math.random() * 9000)}`,
+      hospital_id: CLINIC_ID,
       admission_id: formData.admissionId,
-      doctor_name: formData.doctorName,
       patient_id: formData.patientId,
       ot_id: formData.otId,
       ot_name: formData.otName,
       doctor_id: formData.doctorId,
+      doctor_name: formData.doctorName,
       surgery_type: formData.surgeryType,
       procedure_name: formData.procedureName,
       slot_date: format(slotDate, "yyyy-MM-dd"),
       slot_start_time: formData.slotStartTime,
       slot_end_time: formData.slotEndTime,
-      authorized_by: "Admin"
+      created_by: "Admin"
     };
-
-    console.log("Submitting OT Slot Payload:", payload);
 
     try {
       const response = await axios.post(
@@ -93,21 +134,25 @@ const AddOTSlot = () => {
         { withCredentials: true }
       );
 
-      console.log("OT Slot Response:", response.data);
-
       if (response.data.resSuccess === 1) {
-        toast({ title: "Success", description: "OT Slot added successfully!" });
-        // Reset Form
+        toast({ title: "Success", description: response.data.message || "OT Slot added successfully!" });
+        
         setFormData({
           admissionId: "", patientId: "", patientName: "", phoneNumber: "",
           otId: "", otName: "", doctorName: "", doctorId: "",
           surgeryType: "", procedureName: "", slotStartTime: "", slotEndTime: "",
         });
         setSlotDate(undefined);
+      } else {
+        toast({ title: "Validation Error", description: response.data.message, variant: "destructive" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Submission Error:", error);
-      toast({ title: "Error", description: "Failed to add OT Slot", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: error.response?.data?.message || "Failed to add OT Slot", 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -129,7 +174,7 @@ const AddOTSlot = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               <div className="space-y-2 relative">
-                <Label>Patient Name (Search)</Label>
+                <Label>Patient Name (Search Admitted Patients)</Label>
                 <Input
                   value={formData.patientName}
                   onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
@@ -139,17 +184,22 @@ const AddOTSlot = () => {
                 {showSuggestions && suggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-auto">
                     {suggestions.map((p) => (
-                      <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-sm" onClick={() => {
-                        setFormData({
-                          ...formData,
-                          patientName: p.patient_name,
-                          patientId: p._id,
-                          phoneNumber: p.phone_number,
-                          admissionId: p.current_admission_id || "" // Assuming admission ID comes from patient info
-                        });
-                        setShowSuggestions(false);
-                      }}>
-                        {p.patient_name} ({p.phone_number})
+                      <div 
+                        key={p._id} 
+                        className="p-2 hover:bg-slate-100 cursor-pointer text-sm flex flex-col gap-0.5" 
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            patientName: p.patient_name,
+                            patientId: p.patient_id,       
+                            admissionId: p._id,   
+                            phoneNumber: p.phone_number,
+                          });
+                          setShowSuggestions(false);
+                        }}
+                      >
+                        <div className="font-medium text-slate-900">{p.patient_name} ({p.phone_number})</div>
+                        <div className="text-xs text-muted-foreground font-mono">ID: {p.admission_id}</div>
                       </div>
                     ))}
                   </div>
@@ -167,21 +217,35 @@ const AddOTSlot = () => {
                 />
               </div>
 
+              {/* Dynamic Operating Theatre dropdown selection */}
               <div className="space-y-2">
                 <Label htmlFor="otId">Operating Theatre</Label>
                 <Select
                   value={formData.otId}
-                  onValueChange={(value) => {
-                    const otNames: Record<string, string> = { "6965d76f750616a95352d4c2": "First OT", "ot2": "Second OT" };
-                    setFormData({ ...formData, otId: value, otName: otNames[value] });
+                  disabled={loadingRooms}
+                  onValueChange={(id) => {
+                    // Look up the exact matching room from the dynamically fetched array
+                    const selectedRoom = otRooms.find((room) => room._id === id);
+                    setFormData({ 
+                      ...formData, 
+                      otId: id, 
+                      otName: selectedRoom ? selectedRoom.ot_name : "Unknown OT" 
+                    });
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select OT" />
+                    <SelectValue placeholder={loadingRooms ? "Loading theatres..." : "Select OT Room"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="6965d76f750616a95352d4c2">First OT</SelectItem>
-                    <SelectItem value="ot2">Second OT</SelectItem>
+                    {otRooms.length === 0 && !loadingRooms ? (
+                      <div className="p-2 text-sm text-center text-muted-foreground">No dynamic OTs found</div>
+                    ) : (
+                      otRooms.map((room) => (
+                        <SelectItem key={room._id} value={room._id} disabled={!(room.status === "Active")}>
+                          {room.ot_name} {room.floor ? `(Floor ${room.floor})` : ""}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -209,7 +273,7 @@ const AddOTSlot = () => {
                   <SelectContent>
                     <SelectItem value="Planned">Planned</SelectItem>
                     <SelectItem value="Emergency">Emergency</SelectItem>
-                    <SelectItem value="Minor">Minor</SelectItem>
+                    <SelectItem value="Urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

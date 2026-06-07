@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
+import { billingPost, getBillingMessage, toISODate } from "../billing-api";
 
 interface BillItem {
   id: string;
@@ -65,9 +65,11 @@ interface BillItem {
 const AddBill = () => {
   const [formData, setFormData] = useState({
     admissionId: "",
+    patientId: "",
     patientName: "",
     patientMobileNumber: "",
   });
+  const [loading, setLoading] = useState(false);
 
   const [billItems, setBillItems] = useState<BillItem[]>([
     {
@@ -433,13 +435,131 @@ const AddBill = () => {
     }, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const getItemQuantity = (item: BillItem) => {
+    switch (item.category) {
+      case "Medicine":
+        return Number(item.quantityDispensed || item.quantity) || 0;
+      case "Bed Charges":
+        return Number(item.durationDays || item.quantity) || 0;
+      case "OT Room Charges":
+        return Number(item.durationHours || item.quantity) || 0;
+      case "OT Equipment":
+        return Number(item.quantityUsed || item.quantity) || 0;
+      default:
+        return Number(item.quantity || 1) || 1;
+    }
+  };
+
+  const getItemUnitPrice = (item: BillItem) => {
+    if (item.category === "OT Room Charges") {
+      return Number(item.hourlyRate || item.unitRate) || 0;
+    }
+    return Number(item.unitRate) || 0;
+  };
+
+  const getItemAmount = (item: BillItem) => {
+    const grossAmount = getItemQuantity(item) * getItemUnitPrice(item);
+    const discount = Number(item.discountAmount) || 0;
+    return Math.max(grossAmount - discount, 0);
+  };
+
+  const getItemName = (item: BillItem) => {
+    return (
+      item.medicineName ||
+      item.doctorName ||
+      item.roomName ||
+      item.otRoomName ||
+      item.equipmentName ||
+      item.description ||
+      item.category
+    );
+  };
+
+  const validateBillItems = () => {
+    if (!billItems.length) return "Add at least one bill item.";
+    for (const [index, item] of billItems.entries()) {
+      const label = `Item ${index + 1}`;
+      if (!item.category) return `${label}: select a category.`;
+      if (!getItemName(item)) return `${label}: enter an item name or description.`;
+      if (getItemQuantity(item) <= 0) return `${label}: quantity must be greater than 0.`;
+      if (getItemUnitPrice(item) <= 0) return `${label}: unit price must be greater than 0.`;
+      if (getItemAmount(item) <= 0) return `${label}: amount must be greater than 0.`;
+    }
+    return "";
+  };
+
+  const buildBillItemsPayload = () => {
+    return billItems.map((item) => ({
+      code: item.medicineCode || item.equipmentId || item.doctorId || item.bedId || item.otRoomId || undefined,
+      name: getItemName(item),
+      quantity: getItemQuantity(item),
+      unit_price: getItemUnitPrice(item),
+      amount: getItemAmount(item),
+      discount: Number(item.discountAmount) || 0,
+      notes: item.discountReason || item.issueReason || item.description || undefined,
+      category: item.category,
+      admission_id: formData.admissionId,
+      date: toISODate(item.itemDate || item.visitDate || item.issueDate || item.checkInDate || item.otDate),
+      metadata: {
+        ot_id: item.otId,
+        doctor_id: item.doctorId,
+        doctor_name: item.doctorName,
+        specialization: item.specialization,
+        consultation_type: item.consultationType,
+        medicine_id: item.medicineId,
+        medicine_code: item.medicineCode,
+        unit_of_measurement: item.unitOfMeasurement,
+        bed_id: item.bedId,
+        room_id: item.roomId,
+        room_name: item.roomName,
+        floor: item.floor,
+        department: item.department,
+        room_type: item.roomType,
+        check_out_date: toISODate(item.checkOutDate),
+        ot_room_id: item.otRoomId,
+        procedure_name: item.procedureName,
+        equipment_id: item.equipmentId,
+        equipment_name: item.equipmentName,
+      },
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Bill data:", { ...formData, billItems });
-    toast({
-      title: "Success",
-      description: "Bill created successfully!",
-    });
+    const validationMessage = validateBillItems();
+    if (validationMessage) {
+      toast({ title: "Invalid bill", description: validationMessage, variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await billingPost("add_bill_items", {
+        patient_id: formData.patientId || undefined,
+        admission_id: formData.admissionId || undefined,
+        patient_name: formData.patientName,
+        phone_number: formData.patientMobileNumber,
+        items: buildBillItemsPayload(),
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+      if (response.apiSuccess === 1) {
+        toast({
+          title: "Success",
+          description: response.message || "Bill items added successfully.",
+        });
+      } else {
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "Invalid bill",
+          description: getBillingMessage(response, "Unable to add bill items."),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Unable to connect to billing API.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -456,7 +576,7 @@ const AddBill = () => {
             <CardTitle className="text-lg">Patient Information</CardTitle>
           </CardHeader>
           <CardContent suppressHydrationWarning>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" suppressHydrationWarning>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4" suppressHydrationWarning>
               <div className="space-y-2">
                 <Label htmlFor="admissionId">Admission ID</Label>
                 <Input
@@ -465,6 +585,15 @@ const AddBill = () => {
                   onChange={(e) => setFormData({ ...formData, admissionId: e.target.value })}
                   placeholder="Enter admission ID"
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="patientId">Patient ID</Label>
+                <Input
+                  id="patientId"
+                  value={formData.patientId}
+                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
+                  placeholder="Enter patient ID"
                 />
               </div>
               <div className="space-y-2">
@@ -618,7 +747,8 @@ const AddBill = () => {
           </CardContent>
         </Card>
 
-        <Button type="submit" size="sm">
+        <Button type="submit" size="sm" disabled={loading}>
+          {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           Create Bill
         </Button>
       </form>

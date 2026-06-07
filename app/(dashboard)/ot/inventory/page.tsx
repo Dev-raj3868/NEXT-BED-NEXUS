@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableBody as TBody } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Search, Loader2, PackageX } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -17,114 +17,170 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import axios from "axios";
 
-const mockInventory = [
-  { id: "INV001", itemName: "Surgical Scalpel", itemCode: "SC-001", category: "Surgical Instruments", quantity: 150, unit: "Pieces", minStock: 50, unitPrice: 250, status: "in-stock" },
-  { id: "INV002", itemName: "Surgical Gloves", itemCode: "SG-001", category: "Disposables", quantity: 500, unit: "Boxes", minStock: 100, unitPrice: 450, status: "in-stock" },
-  { id: "INV003", itemName: "Anesthesia Mask", itemCode: "AM-001", category: "Anesthesia Supplies", quantity: 30, unit: "Pieces", minStock: 25, unitPrice: 1200, status: "low-stock" },
-  { id: "INV004", itemName: "Suture Kit", itemCode: "SK-001", category: "Consumables", quantity: 80, unit: "Packs", minStock: 40, unitPrice: 850, status: "in-stock" },
-  { id: "INV005", itemName: "IV Fluid Set", itemCode: "IV-001", category: "Consumables", quantity: 10, unit: "Boxes", minStock: 30, unitPrice: 320, status: "out-of-stock" },
-];
+interface InventoryItem {
+  item_id: string;
+  item_name: string;
+  category: string;
+  stock: number;
+  unit: string;
+  minimum_stock: number;
+  average_purchase_rate: number;
+}
 
 const GetOTInventory = () => {
-  const [searchData, setSearchData] = useState({
+  const CLINIC_ID = "clinic001";
+  const ITEMS_PER_PAGE = 10;
+
+  /* ---------------- STATE MANAGEMENT ---------------- */
+  const [searchInputs, setSearchInputs] = useState({
+    itemName: "",
+    itemCode: "", // Maps to backend data's item_id
+  });
+  
+  // Active query parameters currently locking the table view
+  const [activeFilters, setActiveFilters] = useState({
     itemName: "",
     itemCode: "",
-    category: "",
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showResults, setShowResults] = useState(false);
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(mockInventory.length / itemsPerPage);
 
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showResults, setShowResults] = useState(true);
+
+  /* ---------------- FETCH CALL INTEGRATION ---------------- */
+  const fetchInventoryData = async (page: number, filters: typeof activeFilters) => {
+    try {
+      setLoading(true);
+      const computedOffset = (page - 1) * ITEMS_PER_PAGE;
+
+      const payload: any = {
+        clinic_id: CLINIC_ID,
+        limit: ITEMS_PER_PAGE,
+        offset: computedOffset,
+      };
+
+      // Conditionally append parameter identifiers if specified by search filters
+      if (filters.itemCode.trim()) {
+        payload.item_id = filters.itemCode.trim();
+      }
+
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/ot-modules/get_ot_inventory`,
+        payload,
+        { withCredentials: true }
+      );
+
+      if (response.data.resSuccess === 1) {
+        let results = response.data.data || [];
+        
+        // Client side filtering backup specifically for case-insensitive partial names matching
+        if (filters.itemName.trim()) {
+          const lowerSearch = filters.itemName.toLowerCase();
+          results = results.filter((item: InventoryItem) =>
+            item.item_name?.toLowerCase().includes(lowerSearch)
+          );
+        }
+
+        setInventory(results);
+        setTotalCount(filters.itemName.trim() ? results.length : (response.data.count || 0));
+      }
+    } catch (error) {
+      console.error("Error pulling OT inventory directory:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Synchronizes fetching changes on page navigation or search locks
+  useEffect(() => {
+    fetchInventoryData(currentPage, activeFilters);
+  }, [currentPage, activeFilters]);
+
+  /* ---------------- EVENT ACTIONS ---------------- */
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Search data:", searchData);
+    setCurrentPage(1);
+    setActiveFilters({
+      itemName: searchInputs.itemName,
+      itemCode: searchInputs.itemCode,
+    });
     setShowResults(true);
   };
 
   const handleReset = () => {
-    setSearchData({ itemName: "", itemCode: "", category: "" });
-    setShowResults(false);
+    setSearchInputs({ itemName: "", itemCode: "" });
+    setActiveFilters({ itemName: "", itemCode: "" });
     setCurrentPage(1);
+    setShowResults(true);
+  };
+
+  const calculateStatus = (stock: number, minStock: number) => {
+    if (stock <= 0) return "out-of-stock";
+    if (stock <= minStock) return "low-stock";
+    return "in-stock";
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "in-stock":
-        return <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20">In Stock</Badge>;
+        return <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 shadow-none border-none">In Stock</Badge>;
       case "low-stock":
-        return <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20">Low Stock</Badge>;
+        return <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 shadow-none border-none">Low Stock</Badge>;
       case "out-of-stock":
-        return <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20">Out of Stock</Badge>;
+        return <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 shadow-none border-none">Out of Stock</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">OT Inventory</h1>
-        <p className="text-muted-foreground">Search and manage OT inventory items</p>
+        <p className="text-muted-foreground">Search and manage operational stock records</p>
       </div>
 
       {/* Search Form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Search Inventory</CardTitle>
+          <CardTitle className="text-lg">Search Filters</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="itemName">Item Name</Label>
                 <Input
                   id="itemName"
-                  value={searchData.itemName}
-                  onChange={(e) => setSearchData({ ...searchData, itemName: e.target.value })}
-                  placeholder="Enter item name"
+                  value={searchInputs.itemName}
+                  onChange={(e) => setSearchInputs({ ...searchInputs, itemName: e.target.value })}
+                  placeholder="Filter by item name..."
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="itemCode">Item Code</Label>
+                <Label htmlFor="itemCode">Item Unique ID</Label>
                 <Input
                   id="itemCode"
-                  value={searchData.itemCode}
-                  onChange={(e) => setSearchData({ ...searchData, itemCode: e.target.value })}
-                  placeholder="Enter item code"
+                  value={searchInputs.itemCode}
+                  onChange={(e) => setSearchInputs({ ...searchInputs, itemCode: e.target.value })}
+                  placeholder="Enter specific item identifier"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={searchData.category}
-                  onValueChange={(value) => setSearchData({ ...searchData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="surgical-instruments">Surgical Instruments</SelectItem>
-                    <SelectItem value="consumables">Consumables</SelectItem>
-                    <SelectItem value="equipment">Equipment</SelectItem>
-                    <SelectItem value="disposables">Disposables</SelectItem>
-                    <SelectItem value="medicines">Medicines</SelectItem>
-                    <SelectItem value="anesthesia">Anesthesia Supplies</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <Button type="submit" className="w-full md:w-auto">
-                <Search className="w-4 h-4 mr-2" />
+              <Button type="submit" className="w-full md:w-auto" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                 Search
               </Button>
-              <Button type="button" variant="outline" onClick={handleReset} className="w-full md:w-auto">
+              <Button type="button" variant="outline" onClick={handleReset} className="w-full md:w-auto" disabled={loading}>
                 Reset
               </Button>
             </div>
@@ -132,72 +188,93 @@ const GetOTInventory = () => {
         </CardContent>
       </Card>
 
-      {/* Results Table */}
+      {/* Results Dynamic Container */}
       {showResults && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Inventory Items</CardTitle>
+            <CardTitle className="text-lg">Stock Master Directory</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Min Stock</TableHead>
-                  <TableHead>Unit Price</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockInventory.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.itemCode}</TableCell>
-                    <TableCell>{item.itemName}</TableCell>
-                    <TableCell>{item.category}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{item.unit}</TableCell>
-                    <TableCell>{item.minStock}</TableCell>
-                    <TableCell>₹{item.unitPrice.toLocaleString()}</TableCell>
-                    <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {totalPages > 1 && (
-              <div className="mt-4">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <PaginationItem key={i + 1}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(i + 1)}
-                          isActive={currentPage === i + 1}
-                          className="cursor-pointer"
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                      <PaginationNext
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
+            {loading ? (
+              <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="text-sm font-medium">Syncing live inventory records...</span>
               </div>
+            ) : inventory.length === 0 ? (
+              <div className="flex h-48 flex-col items-center justify-center border border-dashed rounded-lg gap-3">
+                <PackageX className="h-10 w-10 text-muted-foreground stroke-[1.5]" />
+                <p className="text-sm text-muted-foreground font-medium">No inventory data logs match your selection.</p>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50/70">
+                      <TableRow>
+                        <TableHead>Item ID</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead className="text-right">Min Safety Level</TableHead>
+                        <TableHead className="text-right">Rate Cost</TableHead>
+                        <TableHead className="text-center">Availability</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TBody>
+                      {inventory.map((item) => {
+                        const statusKey = calculateStatus(item.stock, item.minimum_stock);
+                        return (
+                          <TableRow key={item.item_id} className="hover:bg-slate-50/50">
+                            <TableCell className="font-mono text-xs font-semibold text-slate-700">{item.item_id}</TableCell>
+                            <TableCell className="font-medium text-slate-900">{item.item_name}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{item.category || "OT-ITEM"}</TableCell>
+                            <TableCell className="text-right font-mono font-bold">{item.stock}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{item.unit || "Pieces"}</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">{item.minimum_stock}</TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              ₹{(item.average_purchase_rate || 0).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-center">{getStatusBadge(statusKey)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TBody>
+                  </Table>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="mt-4">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <PaginationItem key={i + 1}>
+                            <PaginationLink
+                              onClick={() => setCurrentPage(i + 1)}
+                              isActive={currentPage === i + 1}
+                              className="cursor-pointer"
+                            >
+                              {i + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

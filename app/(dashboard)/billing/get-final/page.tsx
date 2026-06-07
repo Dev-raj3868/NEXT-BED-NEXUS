@@ -25,10 +25,10 @@ import {
 } from "@/components/ui/dialog";
 import { useReactToPrint } from "react-to-print";
 import axios from "axios";
+import { toast } from "@/hooks/use-toast";
+import { billingPost, CLINIC_ID, cleanPayload, getBillingMessage } from "../billing-api";
 
 const GetFinalBill = () => {
-  const CLINIC_ID = "clinic001";
-
   /* ---------------- SEARCH STATES ---------------- */
   const [searchData, setSearchData] = useState({
     finalBillId: "",
@@ -44,6 +44,7 @@ const GetFinalBill = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showResults, setShowResults] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
+  const [totalRecords, setTotalRecords] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
 
   /* ---------------- SUGGESTIONS STATES ---------------- */
@@ -53,7 +54,7 @@ const GetFinalBill = () => {
   const [showNameDropdown, setShowNameDropdown] = useState(false);
 
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(bills.length / itemsPerPage);
+  const totalPages = Math.ceil((totalRecords || bills.length) / itemsPerPage);
 
   const fetchSuggestions = async (query: string, type: 'phone' | 'name') => {
     if (query.length < 3) return;
@@ -88,24 +89,31 @@ const GetFinalBill = () => {
     setShowResults(true);
 
     try {
-      const payload = {
-        final_bill_id: searchData.finalBillId || undefined,
-        patient_id: searchData.patientId || undefined,
-      };
+      const response = await billingPost("get_final_bill_table", {
+        filters: cleanPayload({
+          final_bill_id: searchData.finalBillId || undefined,
+          patient_id: searchData.patientId || undefined,
+          payment_status: searchData.paymentStatus && searchData.paymentStatus !== "all" ? searchData.paymentStatus : undefined,
+          pagination: { page: currentPage, limit: itemsPerPage },
+        }),
+      });
 
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/billing/get_final_bill_table`,
-        payload,
-        { withCredentials: true }
-      );
-
-      if (response.data.resSuccess === 1) {
-        setBills(response.data.data || []);
+      if (response.apiSuccess === 1) {
+        const data = response.data as any;
+        setBills(data?.rows || data || []);
+        setTotalRecords(data?.total || data?.rows?.length || data?.length || 0);
       } else {
         setBills([]);
+        setTotalRecords(0);
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "No results",
+          description: getBillingMessage(response, "No final bills found."),
+          variant: response.apiSuccess === -1 ? "destructive" : undefined,
+        });
       }
     } catch (error) {
       console.error("Fetch bills error:", error);
+      toast({ title: "Error", description: "Failed to fetch final bills.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -115,6 +123,7 @@ const GetFinalBill = () => {
     setSearchData({ finalBillId: "", patientName: "", phoneNumber: "", paymentStatus: "", patientId: "" });
     setShowResults(false);
     setBills([]);
+    setTotalRecords(0);
     setCurrentPage(1);
   };
 

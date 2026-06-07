@@ -1,4 +1,5 @@
 'use client';
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,12 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import axios from "axios";
 
 const AddOTInventory = () => {
+  const CLINIC_ID = "clinic001";
+  const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     itemName: "",
-    itemCode: "",
     category: "",
     quantity: "",
     unit: "",
@@ -22,25 +27,70 @@ const AddOTInventory = () => {
     description: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("OT Inventory data:", formData);
-    toast({
-      title: "Success",
-      description: "Inventory item added successfully!",
-    });
-    setFormData({
-      itemName: "",
-      itemCode: "",
-      category: "",
-      quantity: "",
-      unit: "",
-      minStock: "",
-      maxStock: "",
-      supplier: "",
-      unitPrice: "",
-      description: "",
-    });
+    setLoading(true);
+
+    const numericQuantity = Number(formData.quantity) || 0;
+    const numericUnitPrice = Number(formData.unitPrice) || 0;
+
+    // Payload tailored strictly to the core inventory schema layout
+    const payload = {
+      clinic_id: CLINIC_ID,
+      item_name: formData.itemName,
+      stock: numericQuantity,
+      unit: formData.unit,
+      minimum_stock: Number(formData.minStock) || 0,
+      average_purchase_rate: numericUnitPrice,
+      last_purchase_rate: numericUnitPrice,
+      total_value: numericQuantity * numericUnitPrice,
+      created_by: "Admin",
+      updated_by: "Admin",
+      is_batch: false, // Disables nested batch insertion logic entirely
+    };
+
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/ot-modules/create_inventory_ot`,
+        payload,
+        { withCredentials: true }
+      );
+
+      if (response.data.resSuccess === 1) {
+        toast({
+          title: "Success",
+          description: response.data.message || "Inventory item added successfully!",
+        });
+
+        // Reset Form State
+        setFormData({
+          itemName: "",
+          category: "",
+          quantity: "",
+          unit: "",
+          minStock: "",
+          maxStock: "",
+          supplier: "",
+          unitPrice: "",
+          description: "",
+        });
+      } else {
+        toast({
+          title: "Validation Error",
+          description: response.data.message || "Failed to add inventory item.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error("Inventory creation error:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Internal server connection failure.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,24 +107,13 @@ const AddOTInventory = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="itemName">Item Name</Label>
                 <Input
                   id="itemName"
                   value={formData.itemName}
                   onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                   placeholder="Enter item name"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="itemCode">Item Code</Label>
-                <Input
-                  id="itemCode"
-                  value={formData.itemCode}
-                  onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
-                  placeholder="Enter item code"
                   required
                 />
               </div>
@@ -131,7 +170,7 @@ const AddOTInventory = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="unitPrice">Unit Price (₹)</Label>
+                <Label htmlFor="unitPrice">Unit Purchase Price (₹)</Label>
                 <Input
                   id="unitPrice"
                   type="number"
@@ -189,8 +228,8 @@ const AddOTInventory = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full">
-              Add Inventory Item
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Add Inventory Item"}
             </Button>
           </form>
         </CardContent>

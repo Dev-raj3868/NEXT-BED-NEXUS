@@ -10,9 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Calculator } from "lucide-react";
 import axios from "axios";
+import { billingPost, CLINIC_ID, getBillingMessage } from "../billing-api";
 
 const AddFinalBill = () => {
-  const CLINIC_ID = "clinic001";
   const [loading, setLoading] = useState(false);
   
   // Refs for click-outside logic
@@ -21,8 +21,8 @@ const AddFinalBill = () => {
 
   /* ---------------- FORM STATE ---------------- */
   const [formData, setFormData] = useState({
-    hospitalId: CLINIC_ID,
     admissionId: "",
+    billId: "",
     patientId: "",
     patientName: "",
     phoneNumber: "",
@@ -128,10 +128,20 @@ const AddFinalBill = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.patientId && !formData.billId) {
+      toast({ title: "Invalid final bill", description: "Select a patient or enter a bill ID.", variant: "destructive" });
+      return;
+    }
+    if (totals.finalPayable <= 0) {
+      toast({ title: "Invalid final bill", description: "Final payable amount must be greater than 0.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
-      hospital_id: CLINIC_ID,
+      bill_id: formData.billId || undefined,
       admission_id: formData.admissionId,
       patient_id: formData.patientId,
       patient_name: formData.patientName,
@@ -161,23 +171,27 @@ const AddFinalBill = () => {
       additional_discount_amount: formData.additionalDiscountAmount,
       additional_discount_reason: formData.additionalDiscountReason,
       final_payable_amount: totals.finalPayable,
+      discount: formData.additionalDiscountAmount,
+      payments: formData.totalPaid > 0
+        ? [{ amount: formData.totalPaid, payment_method: "advance", date: new Date().toISOString().slice(0, 10) }]
+        : undefined,
       total_paid: formData.totalPaid,
       payment_status: formData.paymentStatus,
       bill_status: formData.billStatus,
+      finalized_by: "RECEPTIONIST_001",
       notes: formData.notes
     };
 
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/billing/create_final_bill`,
-        payload, 
-        {
-          withCredentials: true
-        }
-      );
-      if (response.data.resSuccess === 1) {
-        toast({ title: "Success", description: "Bill created successfully!" });
+      const response = await billingPost("create_final_bill", payload);
+      if (response.apiSuccess === 1) {
+        toast({ title: "Success", description: response.message || "Final bill created successfully." });
       } else {
-        toast({ title: "Error", description: response.data.message, variant: "destructive" });
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "Invalid final bill",
+          description: getBillingMessage(response, "Unable to create final bill."),
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({ title: "Failed", description: "API Connection Error", variant: "destructive" });
@@ -227,6 +241,7 @@ const AddFinalBill = () => {
 
             <div className="space-y-2"><Label>Admission ID</Label><Input value={formData.admissionId} readOnly className="bg-muted" /></div>
             <div className="space-y-2"><Label>Patient ID</Label><Input value={formData.patientId} readOnly className="bg-muted" /></div>
+            <div className="space-y-2"><Label>Bill ID</Label><Input value={formData.billId} onChange={(e) => setFormData({...formData, billId: e.target.value})} placeholder="Optional bill ID" /></div>
             <div className="space-y-2"><Label>Admission Date</Label><Input type="date" value={formData.admissionDate} onChange={(e) => setFormData({...formData, admissionDate: e.target.value})} /></div>
             <div className="space-y-2"><Label>Discharge Date</Label><Input type="date" value={formData.dischargeDate} onChange={(e) => setFormData({...formData, dischargeDate: e.target.value})} /></div>
           </CardContent>

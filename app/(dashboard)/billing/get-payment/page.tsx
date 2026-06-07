@@ -25,10 +25,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { billingPost, CLINIC_ID, cleanPayload, getBillingMessage } from "../billing-api";
 
 const GetPayment = () => {
-  const CLINIC_ID = "clinic001";
-
   // Create a ref for the entire search container
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +51,7 @@ const GetPayment = () => {
   const [showResults, setShowResults] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -95,27 +95,30 @@ const GetPayment = () => {
     setLoading(true);
     setShowResults(true);
 
-    const payload = {
-      hospital_id: CLINIC_ID,
-      bill_id: searchData.billId || undefined,
-      admission_id: searchData.admissionId || undefined,
-      patient_id: searchData.patientId || undefined,
-      from_date: searchData.fromDate || undefined,
-      to_date: searchData.toDate || undefined,
-    };
-
     try {
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/billing/get_payment`,
-        payload,
-        { withCredentials: true }
-      );
+      const response = await billingPost("get_payment", {
+        filters: cleanPayload({
+          bill_id: searchData.billId || undefined,
+          admission_id: searchData.admissionId || undefined,
+          patient_id: searchData.patientId || undefined,
+          from_date: searchData.fromDate || undefined,
+          to_date: searchData.toDate || undefined,
+          pagination: { page: currentPage, limit: itemsPerPage },
+        }),
+      });
 
-      if (response.data.resSuccess === 1) {
-        setPayments(response.data.data || []);
+      if (response.apiSuccess === 1) {
+        const data = response.data as any;
+        setPayments(data?.payments || data || []);
+        setTotalRecords(data?.total || data?.payments?.length || data?.length || 0);
       } else {
         setPayments([]);
-        toast({ title: "No results", description: response.data.message });
+        setTotalRecords(0);
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "No results",
+          description: getBillingMessage(response, "No payments found."),
+          variant: response.apiSuccess === -1 ? "destructive" : undefined,
+        });
       }
     } catch (error) {
       console.error("Fetch Error:", error);
@@ -130,10 +133,34 @@ const GetPayment = () => {
     setSearchQuery("");
     setShowResults(false);
     setPayments([]);
+    setTotalRecords(0);
     setCurrentPage(1);
   };
 
-  const totalPages = Math.ceil(payments.length / itemsPerPage);
+  const handleViewPayment = async (payment: any) => {
+    const paymentId = payment.payment_id || payment._id;
+    if (!paymentId) {
+      setSelectedPayment(payment);
+      return;
+    }
+
+    try {
+      const response = await billingPost("get_single_payment", { payment_id: paymentId });
+      if (response.apiSuccess === 1) {
+        setSelectedPayment((response.data as any)?.payment || response.data || payment);
+      } else {
+        toast({
+          title: response.apiSuccess === -1 ? "Server error" : "Unable to load payment",
+          description: getBillingMessage(response, "Could not fetch payment details."),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to fetch payment details.", variant: "destructive" });
+    }
+  };
+
+  const totalPages = Math.ceil((totalRecords || payments.length) / itemsPerPage);
   const paginatedPayments = payments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
@@ -243,7 +270,7 @@ const GetPayment = () => {
                       <TableCell className="font-bold text-green-700">₹{pay.amount_paid}</TableCell>
                       <TableCell>{format(new Date(pay.payment_date), "dd MMM yyyy")}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedPayment(pay)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewPayment(pay)}>
                           <Eye className="w-4 h-4" />
                         </Button>
                       </TableCell>
