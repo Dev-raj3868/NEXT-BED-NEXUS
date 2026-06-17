@@ -28,6 +28,7 @@ const CreateAdmission = () => {
   const [filteredRooms, setFilteredRooms] = useState<any[]>([]);
   const [beds, setBeds] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [masterLoading, setMasterLoading] = useState(true);
 
   /* ================= PATIENT SEARCH STATES ================= */
   const [isExistingPatient, setIsExistingPatient] = useState(false);
@@ -42,7 +43,6 @@ const CreateAdmission = () => {
   const [patientInfo, setPatientInfo] = useState({
     phoneNumber: "",
     patientId: "",
-    // globalId: "",
     patientName: "",
     emergencyContactName: "",
     emergencyContactNumber: "",
@@ -77,19 +77,37 @@ const CreateAdmission = () => {
   useEffect(() => {
     const fetchBaseData = async () => {
       try {
+        setMasterLoading(true);
         const [floorRes, deptRes, roomRes] = await Promise.all([
           axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, {}, { withCredentials: true }),
           axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, { clinic_id: CLINIC_ID }, { withCredentials: true }),
           axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_rooms`, { clinic_id: CLINIC_ID }, { withCredentials: true })
         ]);
-        console.log("Base Data:", floorRes.data, deptRes.data, roomRes.data);
-        if (floorRes.data.resSuccess === 1) setFloors(floorRes.data.data);
-        if (deptRes.data.resSuccess === 1) setDepartments(deptRes.data.data);
-        if (roomRes.data.resSuccess === 1) setRooms(roomRes.data.data);
-      } catch (err) { console.error("Data fetch error", err); }
+
+        const floorData = floorRes.data.data || [];
+        const deptData = deptRes.data.data || [];
+        const roomData = roomRes.data.data || [];
+
+        if (floorRes.data.resSuccess === 1) setFloors(floorData);
+        if (deptRes.data.resSuccess === 1) setDepartments(deptData);
+        if (roomRes.data.resSuccess === 1) setRooms(roomData);
+
+        // Flash alerts to user if configuration components are entirely missing
+        if (floorData.length === 0 || deptData.length === 0 || roomData.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Setup Configuration Deficit",
+            description: "Missing structural settings. Ensure floors, departments, and rooms exist before completing admission registration.",
+          });
+        }
+      } catch (err) { 
+        console.error("Data fetch error", err); 
+      } finally {
+        setMasterLoading(false);
+      }
     };
     fetchBaseData();
-  }, []);
+  }, [toast]);
 
   /* ================= PATIENT SUGGESTIONS ================= */
   const fetchPatientSuggestions = async (query: string, type: 'phone' | 'name') => {
@@ -107,8 +125,8 @@ const CreateAdmission = () => {
   /* ================= DEPENDENT LOGIC ================= */
   const onFloorChange = (floorId: string) => {
     setBedInfo({ ...bedInfo, floor: floorId, roomId: "", bedId: "" });
-    // setFilteredRooms(rooms.filter(r => r.floor_id === floorId));
-    setFilteredRooms(rooms);
+    setFilteredRooms(rooms.filter(r => r.floor_id === floorId));
+    setBeds([]);
   };
 
   const onRoomChange = async (roomId: string) => {
@@ -118,15 +136,22 @@ const CreateAdmission = () => {
       roomName: selectedRoom?.room_number || "",
       roomType: selectedRoom?.room_category || "",
       roomRate: selectedRoom?.rate_per_day || "",
-      dailyRate: selectedRoom?.rate_per_day || ""
+      dailyRate: selectedRoom?.rate_per_day || "",
+      bedId: ""
     });
 
     try {
       const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_beds`, { clinic_id: CLINIC_ID, room_id: roomId }, { withCredentials: true });
       if (res.data.resSuccess === 1) {
-        console.log("Beds Data:", res.data.data);
-        // setBeds(res.data.data.filter((b: any) => b.status === "AVAILABLE"));
-        setBeds(res.data.data);
+        const bedData = res.data.data || [];
+        setBeds(bedData);
+        if (bedData.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "No Available Beds",
+            description: "The selected room does not contain any functional bed configurations.",
+          });
+        }
       }
     } catch (err) { console.error(err); }
   };
@@ -135,10 +160,8 @@ const CreateAdmission = () => {
     e.preventDefault();
     setLoading(true);
 
-    const selectedFloor = floors.find((f) => f._id === bedInfo.floor);
     const payload = {
-      patient_id: patientInfo.patientId,
-      // global_id: patientInfo.globalId,
+      patient_id: patientInfo.patientId || null,
       admission_date: admissionInfo.admissionDate ? new Date(admissionInfo.admissionDate).toISOString() : null,
       admission_time: admissionInfo.admissionTime,
       admission_type: admissionInfo.admissionType,
@@ -154,49 +177,44 @@ const CreateAdmission = () => {
       emergency_contact_number: patientInfo.emergencyContactNumber,
       advance_Payment: Number(admissionInfo.advancePayment),
       remark: bedInfo.remark,
-      // created_by: "STAFF-456",
       bed_id: bedInfo.bedId,
       room_id: bedInfo.roomId,
       room_name: bedInfo.roomName,
       floor_id: bedInfo.floor,
-      // floor: selectedFloor?.floor_name || "",
       department: bedInfo.department,
       room_type: bedInfo.roomType,
       room_rate: Number(bedInfo.roomRate),
       date_in: bedInfo.dateIn ? new Date(bedInfo.dateIn).toISOString() : null,
       assignment_type: bedInfo.assignmentType,
       daily_rate: Number(bedInfo.dailyRate),
-      // authorized_by: "DR-123",
-      // clinic_id: CLINIC_ID
     };
 
-    console.log("Payload:", payload);
-
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/admissionAndBeds/create_admission`,
-        payload,
-        {
-          withCredentials: true
-        });
-        console.log("Create Admission Response:", res.data);
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/admissionAndBeds/create_admission`, payload, { withCredentials: true });
       if (res.data.resSuccess === 1) {
-        toast({ title: "Admission Created" });
+        toast({ title: "Admission Created successfully!" });
         // Reset form
         setPatientInfo({ phoneNumber: "", patientId: "", patientName: "", emergencyContactName: "", emergencyContactNumber: "" });
         setAdmissionInfo({ admissionDate: "", admissionTime: "", admissionType: "", reasonForAdmission: "", estimatedDischargeDate: "", advancePayment: "" });
         setBedInfo({ doctorName: "", specialization: "", remark: "", bedId: "", roomId: "", roomName: "", floor: "", department: "", roomType: "", roomRate: "", dateIn: "", assignmentType: "Admission", dailyRate: "" });
         setPhoneSuggestions([]);
         setNameSuggestions([]);
+        setSearchPhone("");
+        setSearchName("");
         setShowNameDropdown(false);
         setShowPhoneDropdown(false);
+      } else {
+        toast({ title: "Error", description: res.data.message || "Failed to process admission.", variant: "destructive" });
       }
     } catch (error) { 
-      toast({ title: "Error", variant: "destructive" });
-    }
-    finally {
+      toast({ title: "Error", description: "Server communication breakdown encountered.", variant: "destructive" });
+    } finally {
       setLoading(false);
     }
   };
+
+  // Condition required to safely enable create action buttons
+  const isSetupIncomplete = floors.length === 0 || departments.length === 0 || rooms.length === 0;
 
   return (
     <div className="space-y-6">
@@ -222,13 +240,12 @@ const CreateAdmission = () => {
                   const v = e.target.value;
                   isExistingPatient ? setSearchPhone(v) : setPatientInfo({...patientInfo, phoneNumber: v});
                   if(isExistingPatient) fetchPatientSuggestions(v, 'phone');
-                }} />
+                }} required />
                 {isExistingPatient && showPhoneDropdown && phoneSuggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-auto">
                     {phoneSuggestions.map(p => (
                       <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-sm" onClick={() => {
-                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" 
-                          });
+                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" });
                         setSearchPhone(p.phone_number); setSearchName(p.patient_name); setShowPhoneDropdown(false);
                       }}>{p.phone_number} - {p.patient_name}</div>
                     ))}
@@ -241,21 +258,19 @@ const CreateAdmission = () => {
                   const v = e.target.value;
                   isExistingPatient ? setSearchName(v) : setPatientInfo({...patientInfo, patientName: v});
                   if(isExistingPatient) fetchPatientSuggestions(v, 'name');
-                }} />
+                }} required />
                 {isExistingPatient && showNameDropdown && nameSuggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-auto">
                     {nameSuggestions.map(p => (
                       <div key={p._id} className="p-2 hover:bg-slate-100 cursor-pointer text-sm" onClick={() => {
-                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" 
-                          });
+                        setPatientInfo({ patientName: p.patient_name, phoneNumber: p.phone_number, patientId: p._id, emergencyContactName: p.emergency_contact_name || "", emergencyContactNumber: p.emergency_contact_number || "" });
                         setSearchName(p.patient_name); setSearchPhone(p.phone_number); setShowNameDropdown(false);
                       }}>{p.patient_name} ({p.phone_number})</div>
                     ))}
                   </div>
                 )}
               </div>
-              <div className="space-y-2"><Label>Patient ID</Label><Input value={patientInfo.patientId} readOnly /></div>
-              {/* <div className="space-y-2"><Label>Global ID</Label><Input value={patientInfo.globalId} readOnly /></div> */}
+              <div className="space-y-2"><Label>Patient ID</Label><Input value={patientInfo.patientId} placeholder="Auto-generated if existing" readOnly className="bg-slate-50" /></div>
               <div className="space-y-2"><Label>Emergency Contact</Label><Input value={patientInfo.emergencyContactName} onChange={(e) => setPatientInfo({...patientInfo, emergencyContactName: e.target.value})} readOnly={isExistingPatient} /></div>
               <div className="space-y-2"><Label>Emergency Number</Label><Input value={patientInfo.emergencyContactNumber} onChange={(e) => setPatientInfo({...patientInfo, emergencyContactNumber: e.target.value})} readOnly={isExistingPatient} /></div>
             </div>
@@ -266,12 +281,12 @@ const CreateAdmission = () => {
         <Card>
           <CardHeader><CardTitle>Admission Info</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Admission Date*</Label><Input type="date" value={admissionInfo.admissionDate} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionDate: e.target.value})} /></div>
-            <div className="space-y-2"><Label>Admission Time*</Label><Input type="time" value={admissionInfo.admissionTime} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionTime: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Admission Date*</Label><Input type="date" value={admissionInfo.admissionDate} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionDate: e.target.value})} required /></div>
+            <div className="space-y-2"><Label>Admission Time*</Label><Input type="time" value={admissionInfo.admissionTime} onChange={(e) => setAdmissionInfo({...admissionInfo, admissionTime: e.target.value})} required /></div>
             <div className="space-y-2">
               <Label>Admission Type*</Label>
               <Select onValueChange={(v) => setAdmissionInfo({...admissionInfo, admissionType: v})}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
                 <SelectContent><SelectItem value="direct_admission">Direct Admission</SelectItem><SelectItem value="referral">Referral</SelectItem><SelectItem value="transfer">Transfer</SelectItem></SelectContent>
               </Select>
             </div>
@@ -283,46 +298,71 @@ const CreateAdmission = () => {
 
         {/* ================= BED INFO ================= */}
         <Card>
-          <CardHeader><CardTitle>Bed Info</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Bed Allocation Matrix</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2"><Label>Doctor Name</Label><Input value={bedInfo.doctorName} onChange={(e) => setBedInfo({...bedInfo, doctorName: e.target.value})} /></div>
             <div className="space-y-2">
               <Label>Specialization</Label>
               <Select onValueChange={(v) => setBedInfo({...bedInfo, specialization: v})}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select specialization" /></SelectTrigger>
                 <SelectContent><SelectItem value="cardiology">Cardiology</SelectItem><SelectItem value="orthopedics">Orthopedics</SelectItem><SelectItem value="neurology">Neurology</SelectItem><SelectItem value="general">General Medicine</SelectItem></SelectContent>
               </Select>
             </div>
+
+            {/* Department Downstream Selection */}
             <div className="space-y-2">
-              <Label>Department</Label>
-              <Select onValueChange={(v) => setBedInfo({...bedInfo, department: v})}>
-                <SelectTrigger><SelectValue placeholder="Select Dept" /></SelectTrigger>
-                <SelectContent>{departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)}</SelectContent>
+              <Label>Department*</Label>
+              <Select onValueChange={(v) => setBedInfo({...bedInfo, department: v})} disabled={departments.length === 0 || masterLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder={departments.length === 0 && !masterLoading ? "No departments configured — Please add departments" : "Select Dept"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
+
+            {/* Floor Downstream Selection */}
             <div className="space-y-2">
-              <Label>Floor</Label>
-              <Select onValueChange={onFloorChange}>
-                <SelectTrigger><SelectValue placeholder="Select Floor" /></SelectTrigger>
-                <SelectContent>{floors.map(f => <SelectItem key={f._id} value={f._id}>{f.floor_name}</SelectItem>)}</SelectContent>
+              <Label>Floor*</Label>
+              <Select onValueChange={onFloorChange} disabled={floors.length === 0 || masterLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder={floors.length === 0 && !masterLoading ? "No floors configured — Please add floors" : "Select Floor"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {floors.map(f => <SelectItem key={f._id} value={f._id}>{f.floor_name}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
+
+            {/* Room Downstream Selection */}
             <div className="space-y-2">
-              <Label>Room</Label>
-              <Select onValueChange={onRoomChange} disabled={!bedInfo.floor}>
-                <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
-                <SelectContent>{filteredRooms.map(r => <SelectItem key={r._id} value={r._id}>{r.room_number} ({r.room_category})</SelectItem>)}</SelectContent>
+              <Label>Room*</Label>
+              <Select onValueChange={onRoomChange} disabled={!bedInfo.floor || filteredRooms.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={!bedInfo.floor ? "Select a floor first" : filteredRooms.length === 0 ? "No rooms configured for this floor — Please add rooms" : "Select Room"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredRooms.map(r => <SelectItem key={r._id} value={r._id}>{r.room_number} ({r.room_category})</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
+
+            {/* Bed Downstream Selection */}
             <div className="space-y-2">
-              <Label>Bed</Label>
-              <Select onValueChange={(v) => setBedInfo({...bedInfo, bedId: v})} disabled={!bedInfo.roomId}>
-                <SelectTrigger><SelectValue placeholder="Select Bed" /></SelectTrigger>
-                <SelectContent>{beds.map(b => <SelectItem key={b._id} value={b._id}>Bed {b.bed_number}</SelectItem>)}</SelectContent>
+              <Label>Bed*</Label>
+              <Select onValueChange={(v) => setBedInfo({...bedInfo, bedId: v})} disabled={!bedInfo.roomId || beds.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={!bedInfo.roomId ? "Select a room first" : beds.length === 0 ? "No beds configured for this room — Please add beds" : "Select Bed"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {beds.map(b => <SelectItem key={b._id} value={b._id}>Bed {b.bed_number}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Room Type</Label><Input value={bedInfo.roomType} readOnly /></div>
-            <div className="space-y-2"><Label>Room Rate</Label><Input value={bedInfo.roomRate} readOnly /></div>
+
+            <div className="space-y-2"><Label>Room Type</Label><Input value={bedInfo.roomType} readOnly className="bg-slate-50" /></div>
+            <div className="space-y-2"><Label>Room Rate</Label><Input value={bedInfo.roomRate} readOnly className="bg-slate-50" /></div>
             <div className="space-y-2"><Label>Daily Rate</Label><Input type="number" value={bedInfo.dailyRate} onChange={(e) => setBedInfo({...bedInfo, dailyRate: e.target.value})} /></div>
             <div className="space-y-2"><Label>Date In</Label><Input type="date" value={bedInfo.dateIn} onChange={(e) => setBedInfo({...bedInfo, dateIn: e.target.value})} /></div>
             <div className="space-y-2">
@@ -336,9 +376,13 @@ const CreateAdmission = () => {
           </CardContent>
         </Card>
 
+        {/* Form Submission Controls */}
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline">Cancel</Button>
-          <Button type="submit" disabled={loading}>{loading ? <Loader2 className="animate-spin mr-2" /> : "Create Admission"}</Button>
+          <Button type="submit" disabled={loading || isSetupIncomplete || !bedInfo.bedId}>
+            {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+            {isSetupIncomplete ? "Setup Deficit" : "Create Admission"}
+          </Button>
         </div>
       </form>
     </div>

@@ -34,40 +34,58 @@ const AddRoom = () => {
     amenities: "",
   });
 
-  // Fetch floors on mount to populate the dropdown
+  // Fetch floors and departments on mount
   useEffect(() => {
     const fetchFloors = async () => {
       try {
         const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_floors`, {
           clinic_id: CLINIC_ID,
-        }, {
-          withCredentials: true
-        });
+        }, { withCredentials: true });
+        
         if (response.data.resSuccess === 1) {
-          setFloors(response.data.data);
+          const data = response.data.data || [];
+          setFloors(data);
+          
+          if (data.length === 0) {
+            toast({
+              variant: "destructive",
+              title: "Configuration Required",
+              description: "No floors found. Please add floors to your clinic setup first.",
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching floors:", error);
       }
     };
+
     const fetchDepartments = async () => {
       try {
         const response = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/get_all_departments`, {
           clinic_id: CLINIC_ID,
-        }, {
-          withCredentials: true
-        });
+        }, { withCredentials: true });
+        
         console.log("Departments Response:", response.data);
         if (response.data.resSuccess === 1) {
-          setDepartments(response.data.data);
+          const data = response.data.data || [];
+          setDepartments(data);
+          
+          if (data.length === 0) {
+            toast({
+              variant: "destructive",
+              title: "Configuration Required",
+              description: "No departments found. Please add departments to your clinic setup first.",
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching departments:", error);
       }
     };
+
     fetchFloors();
     fetchDepartments();
-  }, []);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +103,6 @@ const AddRoom = () => {
       room_number: formData.roomNumber,
       rate_per_day: Number(formData.ratePerDay),
       amenities: formData.amenities.split(",").map(item => item.trim()).filter(item => item !== ""),
-      // clinic_id: "clinic123",
     };
 
     console.log("Submitting Room Data:", payload);
@@ -147,43 +164,57 @@ const AddRoom = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              
+              {/* Floor Dropdown Field */}
               <div className="space-y-2">
                 <Label htmlFor="floorId">Floor</Label>
                 <Select
                   value={formData.floorId}
                   onValueChange={(value) => setFormData({ ...formData, floorId: value })}
+                  disabled={floors.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select floor" />
+                    <SelectValue placeholder={floors.length === 0 ? "Please add a floor" : "Select floor"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {floors.map((floor) => (
-                      <SelectItem key={floor._id} value={floor._id}>
-                        {floor.floor_name}
+                    {floors.length === 0 ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground">
+                        No floors available — Please add a floor
                       </SelectItem>
-                    ))}
+                    ) : (
+                      floors.map((floor) => (
+                        <SelectItem key={floor._id} value={floor._id}>
+                          {floor.floor_name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Department Dropdown Field */}
               <div className="space-y-2">
                 <Label htmlFor="department">Department</Label>
                 <Select
                   value={formData.departmentId}
-                  onValueChange={(value) => {
-                    console.log("Selected Department ID:", value);
-                    setFormData({ ...formData, departmentId: value })
-                  }}
+                  onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
+                  disabled={departments.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder={departments.length === 0 ? "Please add a department" : "Select department"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept._id} value={dept._id}>
-                        {dept.name}
+                    {departments.length === 0 ? (
+                      <SelectItem value="none" disabled className="text-muted-foreground">
+                        No departments available — Please add a department
                       </SelectItem>
-                    ))}
+                    ) : (
+                      departments.map((dept) => (
+                        <SelectItem key={dept._id} value={dept._id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -241,7 +272,7 @@ const AddRoom = () => {
               <p className="text-xs text-muted-foreground">Separate items with commas</p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || floors.length === 0 || departments.length === 0}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? "Adding..." : "Add Room"}
             </Button>

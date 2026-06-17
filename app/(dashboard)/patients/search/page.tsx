@@ -29,6 +29,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { set } from "date-fns";
 
 const GetPatient = () => {
   const [searchFilters, setSearchFilters] = useState({
@@ -59,12 +60,18 @@ const GetPatient = () => {
     setIsLoading(true);
     try {
       const payload: any = {
-        clinic_id: CLINIC_ID,
+        // clinic_id: CLINIC_ID,
         page: currentPage,
       };
 
       if (searchFilters.patientId) {
         payload.patient_id = searchFilters.patientId;
+      } else {
+        if (suggestionType === 'name') {
+          payload.patient_name = suggestionValue;
+        } else if (suggestionType === 'phone') {
+          payload.phone_number = suggestionValue;
+        }
       }
       if (searchFilters.startDate) {
         payload.start_date = searchFilters.startDate;
@@ -72,7 +79,7 @@ const GetPatient = () => {
       if (searchFilters.endDate) {
         payload.end_date = searchFilters.endDate;
       }
-
+      console.log("Fetching patients with payload:", payload);
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BASE_URL}/profile/get-patient-information`,
         payload,
@@ -92,12 +99,20 @@ const GetPatient = () => {
         });
       }
     } catch (error: any) {
-      console.error("Error fetching patient information:", error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "An error occurred while fetching patient profiles",
-        variant: "destructive",
-      });
+      if(error.response.data && error.response.data.data.length === 0) {
+        console.log("No patients found for the given criteria.");
+        setPatients([]);
+        setTotalCount(0);
+        setTotalPages(0);
+      } else {
+
+        console.error("Error fetching patient information:", error);
+        toast({
+          title: "Error",
+          description: error.response?.data?.message || "An error occurred while fetching patient profiles",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -211,6 +226,7 @@ const GetPatient = () => {
                       const val = e.target.value;
                       setSuggestionValue(val);
                       const type = /^\d+$/.test(val) ? 'phone' : 'name';
+                      setSuggestionType(type);
                       fetchSuggestions(val, type);
                     }}
                     onFocus={() => {

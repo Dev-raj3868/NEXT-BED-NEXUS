@@ -1,13 +1,42 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
+
+// Strict database enum values array
+const ALLOWED_DEPARTMENTS = [
+  "ICU",
+  "NICU",
+  "PICU",
+  "CICU",
+  "HDU",
+  "General",
+  "Medical Ward",
+  "Surgical Ward",
+  "Orthopedic Ward",
+  "Maternity / Labor & Delivery",
+  "Pediatric Ward",
+  "Geriatric Ward",
+  "Isolation Ward",
+  "Oncology Ward",
+  "Psychiatric Ward",
+  "Burn Unit",
+  "Dialysis Unit",
+  "ER / Casualty",
+  "Day Surgery Unit",
+];
 
 const AddDepartment = () => {
   const { toast } = useToast();
@@ -16,11 +45,20 @@ const AddDepartment = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!departmentName) {
+      toast({
+        variant: "destructive",
+        title: "Selection Required",
+        description: "Please pick a valid department category.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     const payload = {
       name: departmentName,
-      clinic_id: "clinic001", // Replace with actual clinic ID as needed
     };
 
     console.log("Adding new department payload:", payload);
@@ -29,9 +67,7 @@ const AddDepartment = () => {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BASE_URL}/floorsBeds/add_department`,
         payload,
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
 
       console.log("Add Department Response:", response.data);
@@ -65,7 +101,7 @@ const AddDepartment = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Add Department</h1>
-        <p className="text-muted-foreground">Add a new department to the hospital</p>
+        <p className="text-muted-foreground">Add a valid department option to the clinic system</p>
       </div>
 
       <Card className="max-w-md">
@@ -75,17 +111,26 @@ const AddDepartment = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="departmentName">Department Name</Label>
-              <Input
-                id="departmentName"
-                placeholder="e.g. ICU, Cardiology"
+              <Label htmlFor="departmentSelect">Department Category</Label>
+              <Select
                 value={departmentName}
-                onChange={(e) => setDepartmentName(e.target.value)}
-                required
+                onValueChange={(value) => setDepartmentName(value)}
                 disabled={isLoading}
-              />
+              >
+                <SelectTrigger id="departmentSelect">
+                  <SelectValue placeholder="Choose standard department..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALLOWED_DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            
+            <Button type="submit" className="w-full" disabled={isLoading || !departmentName}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

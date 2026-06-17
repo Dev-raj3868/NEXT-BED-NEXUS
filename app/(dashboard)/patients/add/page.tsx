@@ -18,7 +18,7 @@ import { UserPlus, User, Phone, Heart, Crown, CreditCard, Loader2 } from "lucide
 import { toast } from "@/hooks/use-toast";
 
 const AddPatient = () => {
-  const [isVip, setIsVip] = useState(false);
+  // const [isVip, setIsVip] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     patient_name: "",
@@ -39,12 +39,23 @@ const AddPatient = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const CLINIC_ID = "clinic001"; // Mock clinic ID
-    const CREATED_BY = "user001"; // Mock user ID
+    let formattedEndDate: string | undefined = undefined;
+
+    if (formData.membership_end_date) {
+      const dateObj = new Date(formData.membership_end_date);
+      
+      // Verify it's a valid date before formatting to prevent "NaN-NaN-NaN"
+      if (!isNaN(dateObj.getTime())) {
+        const day = String(dateObj.getDate()).padStart(2, "0");
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+        const year = dateObj.getFullYear();
+        
+        formattedEndDate = `${day}-${month}-${year}`;
+      }
+    }
 
     try {
       const payload = {
-        clinic_id: CLINIC_ID,
         patient_name: formData.patient_name,
         phone_number: formData.phone_number,
         secondary_phone_number: formData.secondary_phone_number || undefined,
@@ -54,11 +65,10 @@ const AddPatient = () => {
         pin_code: formData.pin_code || undefined,
         email: formData.email || undefined,
         membership_id: formData.membership_id || undefined,
-        membership_end_date: formData.membership_end_date || undefined,
+        membership_end_date: formattedEndDate || undefined,
         chronic_disease: formData.chronic_disease || undefined,
-        created_by: CREATED_BY,
       };
-
+      console.log("Submitting payload:", payload);
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BASE_URL}/profile/create-patient-profile`,
         payload,
