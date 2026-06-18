@@ -58,13 +58,11 @@ const AddOTSlot = () => {
     const fetchOTRooms = async () => {
       try {
         setLoadingRooms(true);
-        // Pointing to your getOtRoomsTable endpoint routing architecture
         const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/ot-modules/get_ot_rooms`, {
           hospital_id: CLINIC_ID
         }, { withCredentials: true });
-        console.log("Fetched OT Rooms:", res.data);
+        
         if (res.data.resSuccess === 1 && Array.isArray(res.data.data)) {
-          // Filter out inactive rooms optionally, or display all
           setOtRooms(res.data.data);
         } else {
           console.error("Failed to parse dynamic OTs:", res.data.message);
@@ -103,10 +101,7 @@ const AddOTSlot = () => {
   /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!slotDate) {
-      toast({ title: "Error", description: "Please select a slot date", variant: "destructive" });
-      return;
-    }
+    if (!slotDate) return;
 
     setLoading(true);
 
@@ -158,6 +153,18 @@ const AddOTSlot = () => {
     }
   };
 
+  // Check against Mongo Schema properties to block missing properties
+  const isFormIncomplete = 
+    !formData.patientId ||
+    !formData.admissionId ||
+    !formData.otId ||
+    !formData.doctorName.trim() ||
+    !formData.surgeryType ||
+    !formData.procedureName.trim() ||
+    !slotDate ||
+    !formData.slotStartTime ||
+    !formData.slotEndTime;
+
   return (
     <div className="space-y-6">
       <div>
@@ -174,7 +181,7 @@ const AddOTSlot = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               <div className="space-y-2 relative">
-                <Label>Patient Name (Search Admitted Patients)</Label>
+                <Label>Patient Name (Search Admitted Patients) *</Label>
                 <Input
                   value={formData.patientName}
                   onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
@@ -192,7 +199,7 @@ const AddOTSlot = () => {
                             ...formData,
                             patientName: p.patient_name,
                             patientId: p.patient_id,       
-                            admissionId: p._id,   
+                            admissionId: p._id, // Assigning mongo reference id directly as requested
                             phoneNumber: p.phone_number,
                           });
                           setShowSuggestions(false);
@@ -206,25 +213,26 @@ const AddOTSlot = () => {
                 )}
               </div>
 
+              {/* Read-Only Admission Field */}
               <div className="space-y-2">
-                <Label htmlFor="admissionId">Admission ID</Label>
+                <Label htmlFor="admissionId">Admission ID *</Label>
                 <Input
                   id="admissionId"
                   value={formData.admissionId}
-                  onChange={(e) => setFormData({ ...formData, admissionId: e.target.value })}
-                  placeholder="Admission ID"
+                  placeholder="please select an admitted patient"
+                  disabled
+                  className="bg-slate-50 cursor-not-allowed select-none"
                   required
                 />
               </div>
 
               {/* Dynamic Operating Theatre dropdown selection */}
               <div className="space-y-2">
-                <Label htmlFor="otId">Operating Theatre</Label>
+                <Label htmlFor="otId">Operating Theatre *</Label>
                 <Select
                   value={formData.otId}
                   disabled={loadingRooms}
                   onValueChange={(id) => {
-                    // Look up the exact matching room from the dynamically fetched array
                     const selectedRoom = otRooms.find((room) => room._id === id);
                     setFormData({ 
                       ...formData, 
@@ -242,7 +250,7 @@ const AddOTSlot = () => {
                     ) : (
                       otRooms.map((room) => (
                         <SelectItem key={room._id} value={room._id} disabled={!(room.status === "Active")}>
-                          {room.ot_name} {room.floor ? `(Floor ${room.floor})` : ""}
+                          {room.ot_name} {room.floor ? room.floor : ""}
                         </SelectItem>
                       ))
                     )}
@@ -251,7 +259,7 @@ const AddOTSlot = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="doctorName">Surgeon Name</Label>
+                <Label htmlFor="doctorName">Surgeon Name *</Label>
                 <Input
                   id="doctorName"
                   value={formData.doctorName}
@@ -262,7 +270,7 @@ const AddOTSlot = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="surgeryType">Surgery Type</Label>
+                <Label htmlFor="surgeryType">Surgery Type *</Label>
                 <Select
                   value={formData.surgeryType}
                   onValueChange={(value) => setFormData({ ...formData, surgeryType: value })}
@@ -279,7 +287,7 @@ const AddOTSlot = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="procedureName">Procedure Name</Label>
+                <Label htmlFor="procedureName">Procedure Name *</Label>
                 <Input
                   id="procedureName"
                   value={formData.procedureName}
@@ -290,7 +298,7 @@ const AddOTSlot = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Slot Date</Label>
+                <Label>Slot Date *</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !slotDate && "text-muted-foreground")}>
@@ -306,17 +314,17 @@ const AddOTSlot = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-2">
-                  <Label htmlFor="slotStartTime">Start Time</Label>
+                  <Label htmlFor="slotStartTime">Start Time *</Label>
                   <Input id="slotStartTime" type="time" value={formData.slotStartTime} onChange={(e) => setFormData({ ...formData, slotStartTime: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slotEndTime">End Time</Label>
+                  <Label htmlFor="slotEndTime">End Time *</Label>
                   <Input id="slotEndTime" type="time" value={formData.slotEndTime} onChange={(e) => setFormData({ ...formData, slotEndTime: e.target.value })} required />
                 </div>
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || isFormIncomplete}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Schedule OT Slot"}
             </Button>
           </form>

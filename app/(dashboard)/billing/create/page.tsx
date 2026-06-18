@@ -1,5 +1,6 @@
 'use client';
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,39 +8,30 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { billingPost, getBillingMessage, toISODate } from "../billing-api";
+import axios from "axios";
 
-interface BillItem {
-  id: string;
-  category: string;
-  // Common fields
+interface SingleBillItem {
+  category: "Bed Charge" | "Doctor Charge" | "Medicine" | "OT Doctor Charge" | "OT Equipment" | "OT Room Charge" | "OT Other Charge" | "";
   quantity: string;
   unitRate: string;
   discountAmount: string;
   discountReason: string;
   itemDate: Date | undefined;
-  // OT Doctor Charge fields
-  otId?: string;
-  doctorId?: string;
   doctorName?: string;
   specialization?: string;
   visitDate?: Date | undefined;
   consultationType?: string;
-  // Medicine fields
-  medicineId?: string;
   medicineName?: string;
   medicineCode?: string;
   quantityDispensed?: string;
   unitOfMeasurement?: string;
   issueDate?: Date | undefined;
   issueReason?: string;
-  // Bed Charges fields
-  bedId?: string;
-  roomId?: string;
   roomName?: string;
   floor?: string;
   department?: string;
@@ -47,511 +39,209 @@ interface BillItem {
   durationDays?: string;
   checkInDate?: Date | undefined;
   checkOutDate?: Date | undefined;
-  // OT Room Charges fields
-  otRoomId?: string;
   otRoomName?: string;
   durationHours?: string;
   hourlyRate?: string;
   otDate?: Date | undefined;
   procedureName?: string;
-  // OT Equipment fields
-  equipmentId?: string;
   equipmentName?: string;
   quantityUsed?: string;
-  // OT Other Charge
   description?: string;
 }
 
 const AddBill = () => {
+  const CLINIC_ID = "clinic001";
+  const [loading, setLoading] = useState(false);
+
+  /* ================= PATIENT SEARCH STATES ================= */
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<'name' | 'phone'>('name');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  /* ================= FORM STATES ================= */
   const [formData, setFormData] = useState({
     admissionId: "",
     patientId: "",
     patientName: "",
     patientMobileNumber: "",
   });
-  const [loading, setLoading] = useState(false);
 
-  const [billItems, setBillItems] = useState<BillItem[]>([
-    {
-      id: "1",
-      category: "",
-      quantity: "",
-      unitRate: "",
-      discountAmount: "",
-      discountReason: "",
-      itemDate: undefined,
-    },
-  ]);
+  const [billItem, setBillItem] = useState<SingleBillItem>({
+    category: "",
+    quantity: "",
+    unitRate: "",
+    discountAmount: "",
+    discountReason: "",
+    itemDate: undefined,
+  });
 
   const categories = [
-    "OT Doctor Charge",
-    "Medicine",
+    "Bed Charge",
     "Doctor Charge",
-    "OT Other Charge",
+    "Medicine",
+    "OT Doctor Charge",
     "OT Equipment",
-    "Bed Charges",
-    "OT Room Charges",
+    "OT Room Charge",
+    "OT Other Charge",
   ];
 
-  const addBillItem = () => {
-    setBillItems([
-      ...billItems,
-      {
-        id: Date.now().toString(),
-        category: "",
-        quantity: "",
-        unitRate: "",
-        discountAmount: "",
-        discountReason: "",
-        itemDate: undefined,
-      },
-    ]);
-  };
+  /* ================= SUGGESTIONS FETCH LOGIC ================= */
+  useEffect(() => {
+    const getSuggestions = async () => {
+      if (searchQuery.length < 3) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        const payload: any = {};
+        if (searchType === 'name') {
+          payload.patient_name = searchQuery;
+        } else {
+          payload.phone_number = searchQuery;
+        }
 
-  const renderCategoryFields = (item: BillItem) => {
-    switch (item.category) {
-      case "OT Doctor Charge":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>OT ID</Label>
-              <Input value={item.otId || ""} onChange={(e) => updateBillItem(item.id, "otId", e.target.value)} placeholder="Enter OT ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Doctor ID</Label>
-              <Input value={item.doctorId || ""} onChange={(e) => updateBillItem(item.id, "doctorId", e.target.value)} placeholder="Enter Doctor ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Doctor Name</Label>
-              <Input value={item.doctorName || ""} onChange={(e) => updateBillItem(item.id, "doctorName", e.target.value)} placeholder="Enter Doctor Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Specialization</Label>
-              <Input value={item.specialization || ""} onChange={(e) => updateBillItem(item.id, "specialization", e.target.value)} placeholder="Enter Specialization" />
-            </div>
-            <div className="space-y-2">
-              <Label>Visit Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.visitDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.visitDate ? format(item.visitDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.visitDate} onSelect={(date) => updateBillItem(item.id, "visitDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Consultation Type</Label>
-              <Input value={item.consultationType || ""} onChange={(e) => updateBillItem(item.id, "consultationType", e.target.value)} placeholder="Enter Consultation Type" />
-            </div>
-            <div className="space-y-2">
-              <Label>Amount (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
+        const res = await axios.post(
+          `${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`,
+          payload,
+          { withCredentials: true }
         );
-      case "Medicine":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Medicine ID</Label>
-              <Input value={item.medicineId || ""} onChange={(e) => updateBillItem(item.id, "medicineId", e.target.value)} placeholder="Enter Medicine ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Medicine Name</Label>
-              <Input value={item.medicineName || ""} onChange={(e) => updateBillItem(item.id, "medicineName", e.target.value)} placeholder="Enter Medicine Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Medicine Code</Label>
-              <Input value={item.medicineCode || ""} onChange={(e) => updateBillItem(item.id, "medicineCode", e.target.value)} placeholder="Enter Medicine Code" />
-            </div>
-            <div className="space-y-2">
-              <Label>Quantity Dispensed</Label>
-              <Input type="number" value={item.quantityDispensed || ""} onChange={(e) => updateBillItem(item.id, "quantityDispensed", e.target.value)} placeholder="0" />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit of Measurement</Label>
-              <Input value={item.unitOfMeasurement || ""} onChange={(e) => updateBillItem(item.id, "unitOfMeasurement", e.target.value)} placeholder="e.g., Tablets, ml" />
-            </div>
-            <div className="space-y-2">
-              <Label>Issue Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.issueDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.issueDate ? format(item.issueDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.issueDate} onSelect={(date) => updateBillItem(item.id, "issueDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Issue Reason</Label>
-              <Input value={item.issueReason || ""} onChange={(e) => updateBillItem(item.id, "issueReason", e.target.value)} placeholder="Enter Issue Reason" />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit Rate (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
-        );
-      case "Doctor Charge":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Doctor ID</Label>
-              <Input value={item.doctorId || ""} onChange={(e) => updateBillItem(item.id, "doctorId", e.target.value)} placeholder="Enter Doctor ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Doctor Name</Label>
-              <Input value={item.doctorName || ""} onChange={(e) => updateBillItem(item.id, "doctorName", e.target.value)} placeholder="Enter Doctor Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Specialization</Label>
-              <Input value={item.specialization || ""} onChange={(e) => updateBillItem(item.id, "specialization", e.target.value)} placeholder="Enter Specialization" />
-            </div>
-            <div className="space-y-2">
-              <Label>Visit Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.visitDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.visitDate ? format(item.visitDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.visitDate} onSelect={(date) => updateBillItem(item.id, "visitDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Consultation Type</Label>
-              <Input value={item.consultationType || ""} onChange={(e) => updateBillItem(item.id, "consultationType", e.target.value)} placeholder="Enter Consultation Type" />
-            </div>
-            <div className="space-y-2">
-              <Label>Amount (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
-        );
-      case "Bed Charges":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Bed ID</Label>
-              <Input value={item.bedId || ""} onChange={(e) => updateBillItem(item.id, "bedId", e.target.value)} placeholder="Enter Bed ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Room ID</Label>
-              <Input value={item.roomId || ""} onChange={(e) => updateBillItem(item.id, "roomId", e.target.value)} placeholder="Enter Room ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Room Name</Label>
-              <Input value={item.roomName || ""} onChange={(e) => updateBillItem(item.id, "roomName", e.target.value)} placeholder="Enter Room Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Floor</Label>
-              <Input value={item.floor || ""} onChange={(e) => updateBillItem(item.id, "floor", e.target.value)} placeholder="Enter Floor" />
-            </div>
-            <div className="space-y-2">
-              <Label>Department</Label>
-              <Input value={item.department || ""} onChange={(e) => updateBillItem(item.id, "department", e.target.value)} placeholder="Enter Department" />
-            </div>
-            <div className="space-y-2">
-              <Label>Room Type</Label>
-              <Input value={item.roomType || ""} onChange={(e) => updateBillItem(item.id, "roomType", e.target.value)} placeholder="Enter Room Type" />
-            </div>
-            <div className="space-y-2">
-              <Label>Duration (Days)</Label>
-              <Input type="number" value={item.durationDays || ""} onChange={(e) => updateBillItem(item.id, "durationDays", e.target.value)} placeholder="0" />
-            </div>
-            <div className="space-y-2">
-              <Label>Check-in Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.checkInDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.checkInDate ? format(item.checkInDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.checkInDate} onSelect={(date) => updateBillItem(item.id, "checkInDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Check-out Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.checkOutDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.checkOutDate ? format(item.checkOutDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.checkOutDate} onSelect={(date) => updateBillItem(item.id, "checkOutDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Daily Rate (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
-        );
-      case "OT Room Charges":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>OT Room ID</Label>
-              <Input value={item.otRoomId || ""} onChange={(e) => updateBillItem(item.id, "otRoomId", e.target.value)} placeholder="Enter OT Room ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>OT Room Name</Label>
-              <Input value={item.otRoomName || ""} onChange={(e) => updateBillItem(item.id, "otRoomName", e.target.value)} placeholder="Enter OT Room Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Duration (Hours)</Label>
-              <Input type="number" value={item.durationHours || ""} onChange={(e) => updateBillItem(item.id, "durationHours", e.target.value)} placeholder="0" />
-            </div>
-            <div className="space-y-2">
-              <Label>Hourly Rate (₹)</Label>
-              <Input type="number" value={item.hourlyRate || ""} onChange={(e) => updateBillItem(item.id, "hourlyRate", e.target.value)} placeholder="0.00" />
-            </div>
-            <div className="space-y-2">
-              <Label>OT Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !item.otDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {item.otDate ? format(item.otDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={item.otDate} onSelect={(date) => updateBillItem(item.id, "otDate", date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Procedure Name</Label>
-              <Input value={item.procedureName || ""} onChange={(e) => updateBillItem(item.id, "procedureName", e.target.value)} placeholder="Enter Procedure Name" />
-            </div>
-          </>
-        );
-      case "OT Equipment":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Equipment ID</Label>
-              <Input value={item.equipmentId || ""} onChange={(e) => updateBillItem(item.id, "equipmentId", e.target.value)} placeholder="Enter Equipment ID" />
-            </div>
-            <div className="space-y-2">
-              <Label>Equipment Name</Label>
-              <Input value={item.equipmentName || ""} onChange={(e) => updateBillItem(item.id, "equipmentName", e.target.value)} placeholder="Enter Equipment Name" />
-            </div>
-            <div className="space-y-2">
-              <Label>Quantity Used</Label>
-              <Input type="number" value={item.quantityUsed || ""} onChange={(e) => updateBillItem(item.id, "quantityUsed", e.target.value)} placeholder="0" />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit Rate (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
-        );
-      case "OT Other Charge":
-        return (
-          <>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Description</Label>
-              <Input value={item.description || ""} onChange={(e) => updateBillItem(item.id, "description", e.target.value)} placeholder="Enter charge description" />
-            </div>
-            <div className="space-y-2">
-              <Label>Amount (₹)</Label>
-              <Input type="number" value={item.unitRate || ""} onChange={(e) => updateBillItem(item.id, "unitRate", e.target.value)} placeholder="0.00" />
-            </div>
-          </>
-        );
-      default:
-        return null;
+
+        if (res.data.resSuccess === 1) {
+          setSuggestions(res.data.data || []);
+          setShowSuggestions(true);
+        }
+      } catch (err) {
+        console.error("Error fetching admitted patient suggestions:", err);
       }
     };
 
-  const removeBillItem = (id: string) => {
-    if (billItems.length > 1) {
-      setBillItems(billItems.filter((item) => item.id !== id));
-    }
+    const timeout = setTimeout(getSuggestions, 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, searchType]);
+
+  const updateBillItem = (field: keyof SingleBillItem, value: any) => {
+    setBillItem((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateBillItem = (id: string, field: keyof BillItem, value: any) => {
-    setBillItems(
-      billItems.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
-  };
-
-  const calculateTotal = () => {
-    return billItems.reduce((total, item) => {
-      let amount = 0;
-      switch (item.category) {
-        case "OT Doctor Charge":
-        case "Doctor Charge":
-        case "OT Other Charge":
-          amount = parseFloat(item.unitRate) || 0;
-          break;
-        case "Medicine":
-          const medQty = parseFloat(item.quantityDispensed || item.quantity) || 0;
-          const medRate = parseFloat(item.unitRate) || 0;
-          amount = medQty * medRate;
-          break;
-        case "Bed Charges":
-          const bedDays = parseFloat(item.durationDays || item.quantity) || 0;
-          const bedRate = parseFloat(item.unitRate) || 0;
-          amount = bedDays * bedRate;
-          break;
-        case "OT Room Charges":
-          const otHours = parseFloat(item.durationHours || item.quantity) || 0;
-          const otRate = parseFloat(item.hourlyRate || item.unitRate) || 0;
-          amount = otHours * otRate;
-          break;
-        case "OT Equipment":
-          const equipQty = parseFloat(item.quantityUsed || item.quantity) || 0;
-          const equipRate = parseFloat(item.unitRate) || 0;
-          amount = equipQty * equipRate;
-          break;
-        default:
-          const qty = parseFloat(item.quantity) || 0;
-          const rate = parseFloat(item.unitRate) || 0;
-          amount = qty * rate;
-      }
-      const discount = parseFloat(item.discountAmount) || 0;
-      return total + (amount - discount);
-    }, 0);
-  };
-
-  const getItemQuantity = (item: BillItem) => {
-    switch (item.category) {
+  const getItemQuantity = () => {
+    switch (billItem.category) {
       case "Medicine":
-        return Number(item.quantityDispensed || item.quantity) || 0;
-      case "Bed Charges":
-        return Number(item.durationDays || item.quantity) || 0;
-      case "OT Room Charges":
-        return Number(item.durationHours || item.quantity) || 0;
+        return Number(billItem.quantityDispensed || billItem.quantity) || 1;
+      case "Bed Charge":
+        return Number(billItem.durationDays || billItem.quantity) || 1;
+      case "OT Room Charge":
+        return Number(billItem.durationHours || billItem.quantity) || 1;
       case "OT Equipment":
-        return Number(item.quantityUsed || item.quantity) || 0;
+        return Number(billItem.quantityUsed || billItem.quantity) || 1;
       default:
-        return Number(item.quantity || 1) || 1;
+        return Number(billItem.quantity) || 1;
     }
   };
 
-  const getItemUnitPrice = (item: BillItem) => {
-    if (item.category === "OT Room Charges") {
-      return Number(item.hourlyRate || item.unitRate) || 0;
+  const getItemUnitPrice = () => {
+    if (billItem.category === "OT Room Charge") {
+      return Number(billItem.hourlyRate || billItem.unitRate) || 0;
     }
-    return Number(item.unitRate) || 0;
+    return Number(billItem.unitRate) || 0;
   };
 
-  const getItemAmount = (item: BillItem) => {
-    const grossAmount = getItemQuantity(item) * getItemUnitPrice(item);
-    const discount = Number(item.discountAmount) || 0;
+  const getItemAmount = () => {
+    const grossAmount = getItemQuantity() * getItemUnitPrice();
+    const discount = Number(billItem.discountAmount) || 0;
     return Math.max(grossAmount - discount, 0);
   };
 
-  const getItemName = (item: BillItem) => {
+  const getItemDescription = () => {
     return (
-      item.medicineName ||
-      item.doctorName ||
-      item.roomName ||
-      item.otRoomName ||
-      item.equipmentName ||
-      item.description ||
-      item.category
+      billItem.medicineName ||
+      billItem.doctorName ||
+      billItem.roomName ||
+      billItem.otRoomName ||
+      billItem.equipmentName ||
+      billItem.description ||
+      billItem.category ||
+      ""
     );
   };
 
-  const validateBillItems = () => {
-    if (!billItems.length) return "Add at least one bill item.";
-    for (const [index, item] of billItems.entries()) {
-      const label = `Item ${index + 1}`;
-      if (!item.category) return `${label}: select a category.`;
-      if (!getItemName(item)) return `${label}: enter an item name or description.`;
-      if (getItemQuantity(item) <= 0) return `${label}: quantity must be greater than 0.`;
-      if (getItemUnitPrice(item) <= 0) return `${label}: unit price must be greater than 0.`;
-      if (getItemAmount(item) <= 0) return `${label}: amount must be greater than 0.`;
-    }
-    return "";
-  };
-
-  const buildBillItemsPayload = () => {
-    return billItems.map((item) => ({
-      code: item.medicineCode || item.equipmentId || item.doctorId || item.bedId || item.otRoomId || undefined,
-      name: getItemName(item),
-      quantity: getItemQuantity(item),
-      unit_price: getItemUnitPrice(item),
-      amount: getItemAmount(item),
-      discount: Number(item.discountAmount) || 0,
-      notes: item.discountReason || item.issueReason || item.description || undefined,
-      category: item.category,
-      admission_id: formData.admissionId,
-      date: toISODate(item.itemDate || item.visitDate || item.issueDate || item.checkInDate || item.otDate),
-      metadata: {
-        ot_id: item.otId,
-        doctor_id: item.doctorId,
-        doctor_name: item.doctorName,
-        specialization: item.specialization,
-        consultation_type: item.consultationType,
-        medicine_id: item.medicineId,
-        medicine_code: item.medicineCode,
-        unit_of_measurement: item.unitOfMeasurement,
-        bed_id: item.bedId,
-        room_id: item.roomId,
-        room_name: item.roomName,
-        floor: item.floor,
-        department: item.department,
-        room_type: item.roomType,
-        check_out_date: toISODate(item.checkOutDate),
-        ot_room_id: item.otRoomId,
-        procedure_name: item.procedureName,
-        equipment_id: item.equipmentId,
-        equipment_name: item.equipmentName,
-      },
-    }));
-  };
-
+  /* ================= SUBMIT ACTION ================= */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationMessage = validateBillItems();
-    if (validationMessage) {
-      toast({ title: "Invalid bill", description: validationMessage, variant: "destructive" });
+
+    if (!formData.admissionId || !formData.patientId) {
+      toast({ title: "Validation Error", description: "Please search and select an active admitted patient first.", variant: "destructive" });
+      return;
+    }
+    if (!billItem.category) {
+      toast({ title: "Validation Error", description: "Please select a category.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
+
+    const metadataPayload: Record<string, any> = {
+      doctor_name: billItem.doctorName || undefined,
+      specialization: billItem.specialization || undefined,
+      consultation_type: billItem.consultationType || undefined,
+      medicine_code: billItem.medicineCode || undefined,
+      unit_of_measurement: billItem.unitOfMeasurement || undefined,
+      room_name: billItem.roomName || undefined,
+      floor: billItem.floor || undefined,
+      department: billItem.department || undefined,
+      room_type: billItem.roomType || undefined,
+      procedure_name: billItem.procedureName || undefined,
+      equipment_name: billItem.equipmentName || undefined,
+    };
+
+    if (billItem.category === "Bed Charge") {
+      metadataPayload.duration_days = Number(billItem.durationDays) || getItemQuantity();
+      metadataPayload.check_in_date = toISODate(billItem.checkInDate);
+      metadataPayload.check_out_date = toISODate(billItem.checkOutDate);
+    } else if (billItem.category === "Doctor Charge") {
+      metadataPayload.visit_date = toISODate(billItem.visitDate || new Date());
+    } else if (billItem.category === "Medicine") {
+      metadataPayload.quantity_dispensed = Number(billItem.quantityDispensed) || getItemQuantity();
+      metadataPayload.issue_date = toISODate(billItem.issueDate);
+    } else if (["OT Doctor Charge", "OT Equipment", "OT Room Charge"].includes(billItem.category)) {
+      metadataPayload.procedure_name = billItem.procedureName || "Operational Procedure";
+      metadataPayload.ot_date = toISODate(billItem.otDate);
+    }
+
+    // Single item payload structure mapping root levels to match your exact backend handler requirements
+    const payload = {
+      hospital_id: CLINIC_ID,
+      admission_id: formData.admissionId,
+      patient_id: formData.patientId,
+      category: billItem.category,
+      item_description: getItemDescription(),
+      quantity: getItemQuantity(),
+      unit_rate: getItemUnitPrice(),
+      discount_amount: Number(billItem.discountAmount) || 0,
+      discount_remark: billItem.discountReason || undefined,
+      metadata: metadataPayload,
+      item_date: billItem.itemDate || billItem.visitDate || billItem.issueDate || billItem.checkInDate || billItem.otDate || new Date(),
+      created_by: "Admin",
+    };
+
     try {
-      const response = await billingPost("add_bill_items", {
-        patient_id: formData.patientId || undefined,
-        admission_id: formData.admissionId || undefined,
-        patient_name: formData.patientName,
-        phone_number: formData.patientMobileNumber,
-        items: buildBillItemsPayload(),
-        date: new Date().toISOString().slice(0, 10),
-      });
+      console.log("Submitting bill item payload format:", payload);
+
+      const response = await billingPost("add_bill_items", payload);
 
       if (response.apiSuccess === 1) {
         toast({
           title: "Success",
-          description: response.message || "Bill items added successfully.",
+          description: response.message || "Bill item added successfully.",
         });
+        
+        setFormData({ admissionId: "", patientId: "", patientName: "", patientMobileNumber: "" });
+        setSearchQuery("");
+        setBillItem({ category: "", quantity: "", unitRate: "", discountAmount: "", discountReason: "", itemDate: undefined });
       } else {
         toast({
           title: response.apiSuccess === -1 ? "Server error" : "Invalid bill",
-          description: getBillingMessage(response, "Unable to add bill items."),
+          description: getBillingMessage(response, "Unable to add bill item."),
           variant: "destructive",
         });
       }
@@ -562,194 +252,415 @@ const AddBill = () => {
     }
   };
 
+  const renderCategoryFields = () => {
+    switch (billItem.category) {
+      case "OT Doctor Charge":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Doctor Name</Label>
+              <Input value={billItem.doctorName || ""} onChange={(e) => updateBillItem("doctorName", e.target.value)} placeholder="Enter Doctor Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Specialization</Label>
+              <Input value={billItem.specialization || ""} onChange={(e) => updateBillItem("specialization", e.target.value)} placeholder="Enter Specialization" />
+            </div>
+            <div className="space-y-2">
+              <Label>Procedure Name *</Label>
+              <Input value={billItem.procedureName || ""} onChange={(e) => updateBillItem("procedureName", e.target.value)} placeholder="e.g. Appendectomy" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Visit Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.visitDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.visitDate ? format(billItem.visitDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.visitDate} onSelect={(date) => updateBillItem("visitDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Consultation Type</Label>
+              <Input value={billItem.consultationType || ""} onChange={(e) => updateBillItem("consultationType", e.target.value)} placeholder="Enter Consultation Type" />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      case "Medicine":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Medicine Name</Label>
+              <Input value={billItem.medicineName || ""} onChange={(e) => updateBillItem("medicineName", e.target.value)} placeholder="Enter Medicine Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Medicine Code</Label>
+              <Input value={billItem.medicineCode || ""} onChange={(e) => updateBillItem("medicineCode", e.target.value)} placeholder="Enter Medicine Code" />
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity Dispensed *</Label>
+              <Input type="number" value={billItem.quantityDispensed || ""} onChange={(e) => updateBillItem("quantityDispensed", e.target.value)} placeholder="0" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Unit of Measurement</Label>
+              <Input value={billItem.unitOfMeasurement || ""} onChange={(e) => updateBillItem("unitOfMeasurement", e.target.value)} placeholder="e.g., Tablets, ml" />
+            </div>
+            <div className="space-y-2">
+              <Label>Issue Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.issueDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.issueDate ? format(billItem.issueDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.issueDate} onSelect={(date) => updateBillItem("issueDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Issue Reason</Label>
+              <Input value={billItem.issueReason || ""} onChange={(e) => updateBillItem("issueReason", e.target.value)} placeholder="Enter Issue Reason" />
+            </div>
+            <div className="space-y-2">
+              <Label>Unit Rate (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      case "Doctor Charge":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Doctor Name</Label>
+              <Input value={billItem.doctorName || ""} onChange={(e) => updateBillItem("doctorName", e.target.value)} placeholder="Enter Doctor Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Specialization</Label>
+              <Input value={billItem.specialization || ""} onChange={(e) => updateBillItem("specialization", e.target.value)} placeholder="Enter Specialization" />
+            </div>
+            <div className="space-y-2">
+              <Label>Visit Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.visitDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.visitDate ? format(billItem.visitDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.visitDate} onSelect={(date) => updateBillItem("visitDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Consultation Type</Label>
+              <Input value={billItem.consultationType || ""} onChange={(e) => updateBillItem("consultationType", e.target.value)} placeholder="Enter Consultation Type" />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      case "Bed Charge":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Room Name</Label>
+              <Input value={billItem.roomName || ""} onChange={(e) => updateBillItem("roomName", e.target.value)} placeholder="Enter Room Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Floor</Label>
+              <Input value={billItem.floor || ""} onChange={(e) => updateBillItem("floor", e.target.value)} placeholder="Enter Floor" />
+            </div>
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Input value={billItem.department || ""} onChange={(e) => updateBillItem("department", e.target.value)} placeholder="Enter Department" />
+            </div>
+            <div className="space-y-2">
+              <Label>Room Type</Label>
+              <Input value={billItem.roomType || ""} onChange={(e) => updateBillItem("roomType", e.target.value)} placeholder="Enter Room Type" />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration (Days) *</Label>
+              <Input type="number" value={billItem.durationDays || ""} onChange={(e) => updateBillItem("durationDays", e.target.value)} placeholder="0" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Check-in Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.checkInDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.checkInDate ? format(billItem.checkInDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.checkInDate} onSelect={(date) => updateBillItem("checkInDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Check-out Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.checkOutDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.checkOutDate ? format(billItem.checkOutDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.checkOutDate} onSelect={(date) => updateBillItem("checkOutDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Daily Rate (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      case "OT Room Charge":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>OT Room Name</Label>
+              <Input value={billItem.otRoomName || ""} onChange={(e) => updateBillItem("otRoomName", e.target.value)} placeholder="Enter OT Room Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Procedure Name *</Label>
+              <Input value={billItem.procedureName || ""} onChange={(e) => updateBillItem("procedureName", e.target.value)} placeholder="e.g. Laparoscopic Appendectomy" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration (Hours) *</Label>
+              <Input type="number" value={billItem.durationHours || ""} onChange={(e) => updateBillItem("durationHours", e.target.value)} placeholder="0" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Hourly Rate (₹) *</Label>
+              <Input type="number" value={billItem.hourlyRate || ""} onChange={(e) => updateBillItem("hourlyRate", e.target.value)} placeholder="0.00" required />
+            </div>
+            <div className="space-y-2">
+              <Label>OT Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !billItem.otDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {billItem.otDate ? format(billItem.otDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={billItem.otDate} onSelect={(date) => updateBillItem("otDate", date)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </>
+        );
+      case "OT Equipment":
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Equipment Name</Label>
+              <Input value={billItem.equipmentName || ""} onChange={(e) => updateBillItem("equipmentName", e.target.value)} placeholder="Enter Equipment Name" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Procedure Name *</Label>
+              <Input value={billItem.procedureName || ""} onChange={(e) => updateBillItem("procedureName", e.target.value)} placeholder="Procedure Identifier" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity Used *</Label>
+              <Input type="number" value={billItem.quantityUsed || ""} onChange={(e) => updateBillItem("quantityUsed", e.target.value)} placeholder="0" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Unit Rate (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      case "OT Other Charge":
+        return (
+          <>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Description *</Label>
+              <Input value={billItem.description || ""} onChange={(e) => updateBillItem("description", e.target.value)} placeholder="Enter charge description" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (₹) *</Label>
+              <Input type="number" value={billItem.unitRate || ""} onChange={(e) => updateBillItem("unitRate", e.target.value)} placeholder="0.00" required />
+            </div>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const isFormIncomplete = !formData.admissionId || !billItem.category || !getItemDescription();
+
   return (
     <div className="space-y-6" suppressHydrationWarning>
       <div>
         <h1 className="text-2xl font-bold text-foreground">Create Bill</h1>
-        <p className="text-muted-foreground">Add billing items for a patient admission</p>
+        <p className="text-muted-foreground">Add a single billing item for a patient admission</p>
       </div>
 
+      {/* Admitted Patient Live Search Block */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="w-5 h-5 text-muted-foreground" />
+            Search Active Admitted Patient
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 relative">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Search Method</Label>
+              <Select value={searchType} onValueChange={(val: 'name' | 'phone') => { setSearchType(val); setSearchQuery(""); setSuggestions([]); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Search Filter Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Patient Name Search</SelectItem>
+                  <SelectItem value="phone">Phone Number Search</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-2 relative">
+              <Label>Search Input</Label>
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={searchType === 'name' ? "Type patient's name to lookup..." : "Type phone number to lookup..."}
+              />
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-[calc(100%+4px)] z-50 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {suggestions.map((p) => (
+                    <div
+                      key={p._id}
+                      className="p-3 hover:bg-slate-100 cursor-pointer text-sm flex flex-col border-b last:border-0"
+                      onClick={() => {
+                        setFormData({
+                          admissionId: p._id, 
+                          patientId: p.patient_id,
+                          patientName: p.patient_name,
+                          patientMobileNumber: p.phone_number,
+                        });
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <div className="font-semibold text-slate-900">{p.patient_name} ({p.phone_number})</div>
+                      <div className="text-xs text-muted-foreground font-mono mt-0.5">Admission Tracking ID: {p.admission_id}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <form onSubmit={handleSubmit} className="space-y-6" suppressHydrationWarning>
-        {/* Patient Info */}
+        {/* Read-Only Patient Information Overview */}
         <Card suppressHydrationWarning>
           <CardHeader>
             <CardTitle className="text-lg">Patient Information</CardTitle>
           </CardHeader>
           <CardContent suppressHydrationWarning>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4" suppressHydrationWarning>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="admissionId">Admission ID</Label>
-                <Input
-                  id="admissionId"
-                  value={formData.admissionId}
-                  onChange={(e) => setFormData({ ...formData, admissionId: e.target.value })}
-                  placeholder="Enter admission ID"
-                  required
-                />
+                <Input id="admissionId" value={formData.admissionId} readOnly className="bg-slate-50 cursor-not-allowed font-mono text-xs" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="patientId">Patient ID</Label>
-                <Input
-                  id="patientId"
-                  value={formData.patientId}
-                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-                  placeholder="Enter patient ID"
-                />
+                <Input id="patientId" value={formData.patientId} readOnly className="bg-slate-50 cursor-not-allowed font-mono text-xs" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="patientName">Patient Name</Label>
-                <Input
-                  id="patientName"
-                  value={formData.patientName}
-                  onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
-                  placeholder="Enter patient name"
-                  required
-                />
+                <Input id="patientName" value={formData.patientName} readOnly className="bg-slate-50 cursor-not-allowed" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="patientMobileNumber">Patient Mobile Number</Label>
-                <Input
-                  id="patientMobileNumber"
-                  value={formData.patientMobileNumber}
-                  onChange={(e) => setFormData({ ...formData, patientMobileNumber: e.target.value })}
-                  placeholder="Enter patient mobile number"
-                  required
-                />
+                <Input id="patientMobileNumber" value={formData.patientMobileNumber} readOnly className="bg-slate-50 cursor-not-allowed" required />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Bill Items */}
+        {/* Singular Dynamic Billing Charge Card */}
         <Card suppressHydrationWarning>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Bill Items</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addBillItem}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
+          <CardHeader>
+            <CardTitle className="text-lg">Billing Charge Details</CardTitle>
           </CardHeader>
           <CardContent suppressHydrationWarning className="space-y-6">
-            {billItems.map((item, index) => (
-              <div key={item.id} className="p-4 border rounded-lg space-y-4 bg-muted/30" suppressHydrationWarning>
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Item {index + 1}</h4>
-                  {billItems.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeBillItem(item.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+            <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Category *</Label>
+                  <Select
+                    value={billItem.category}
+                    onValueChange={(value: any) => setBillItem({ ...billItem, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {billItem.category && renderCategoryFields()}
+              </div>
+
+              {billItem.category && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                   <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select
-                      value={item.category}
-                      onValueChange={(value) => updateBillItem(item.id, "category", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Discount Amount (₹)</Label>
+                    <Input
+                      type="number"
+                      value={billItem.discountAmount}
+                      onChange={(e) => updateBillItem("discountAmount", e.target.value)}
+                      placeholder="0.00"
+                    />
                   </div>
-
-                  {item.category && (
-                    <>
-                      {renderCategoryFields(item)}
-                    </>
-                  )}
+                  <div className="space-y-2">
+                    <Label>Discount Reason</Label>
+                    <Input
+                      value={billItem.discountReason}
+                      onChange={(e) => updateBillItem("discountReason", e.target.value)}
+                      placeholder="Enter reason if discount applied"
+                    />
+                  </div>
                 </div>
+              )}
 
-                {item.category && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-                    <div className="space-y-2">
-                      <Label>Discount Amount (₹)</Label>
-                      <Input
-                        type="number"
-                        value={item.discountAmount}
-                        onChange={(e) => updateBillItem(item.id, "discountAmount", e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Discount Reason</Label>
-                      <Input
-                        value={item.discountReason}
-                        onChange={(e) => updateBillItem(item.id, "discountReason", e.target.value)}
-                        placeholder="Enter discount reason (if any)"
-                      />
-                    </div>
+              {billItem.category && (
+                <div className="flex justify-end border-t pt-4">
+                  <div className="text-base font-bold text-emerald-700">
+                    Total Amount to Charge: ₹{getItemAmount().toFixed(2)}
                   </div>
-                )}
-
-                {item.category && (
-                  <div className="flex justify-end border-t pt-4">
-                    <div className="text-sm text-muted-foreground">
-                      {(() => {
-                        let amount = 0;
-                        switch (item.category) {
-                          case "OT Doctor Charge":
-                          case "Doctor Charge":
-                          case "OT Other Charge":
-                            amount = parseFloat(item.unitRate) || 0;
-                            break;
-                          case "Medicine":
-                            const medQty = parseFloat(item.quantityDispensed || item.quantity) || 0;
-                            const medRate = parseFloat(item.unitRate) || 0;
-                            amount = medQty * medRate;
-                            break;
-                          case "Bed Charges":
-                            const bedDays = parseFloat(item.durationDays || item.quantity) || 0;
-                            const bedRate = parseFloat(item.unitRate) || 0;
-                            amount = bedDays * bedRate;
-                            break;
-                          case "OT Room Charges":
-                            const otHours = parseFloat(item.durationHours || item.quantity) || 0;
-                            const otRate = parseFloat(item.hourlyRate || item.unitRate) || 0;
-                            amount = otHours * otRate;
-                            break;
-                          case "OT Equipment":
-                            const equipQty = parseFloat(item.quantityUsed || item.quantity) || 0;
-                            const equipRate = parseFloat(item.unitRate) || 0;
-                            amount = equipQty * equipRate;
-                            break;
-                          default:
-                            amount = 0;
-                        }
-                        const discount = parseFloat(item.discountAmount) || 0;
-                        return `Item Total: ₹${(amount - discount).toFixed(2)}`;
-                      })()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            <div className="flex justify-end pt-4 border-t">
-              <div className="text-lg font-semibold">
-                Grand Total: ₹{calculateTotal().toFixed(2)}
-              </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Button type="submit" size="sm" disabled={loading}>
+        <Button type="submit" size="sm" disabled={loading || isFormIncomplete}>
           {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Create Bill
+          Add Line Item
         </Button>
       </form>
     </div>

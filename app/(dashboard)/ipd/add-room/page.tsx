@@ -150,6 +150,14 @@ const AddRoom = () => {
     }
   };
 
+  // Evaluate if any of the mandatory payload fields remain unselected or empty
+  const isFormIncomplete = 
+    !formData.floorId || 
+    !formData.departmentId || 
+    !formData.roomCategory || 
+    !formData.roomNumber.trim() || 
+    !formData.ratePerDay;
+
   return (
     <div className="space-y-6">
       <div>
@@ -167,7 +175,7 @@ const AddRoom = () => {
               
               {/* Floor Dropdown Field */}
               <div className="space-y-2">
-                <Label htmlFor="floorId">Floor</Label>
+                <Label htmlFor="floorId">Floor *</Label>
                 <Select
                   value={formData.floorId}
                   onValueChange={(value) => setFormData({ ...formData, floorId: value })}
@@ -194,7 +202,7 @@ const AddRoom = () => {
 
               {/* Department Dropdown Field */}
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department">Department *</Label>
                 <Select
                   value={formData.departmentId}
                   onValueChange={(value) => setFormData({ ...formData, departmentId: value })}
@@ -220,7 +228,7 @@ const AddRoom = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="roomCategory">Room Category</Label>
+                <Label htmlFor="roomCategory">Room Category *</Label>
                 <Select
                   value={formData.roomCategory}
                   onValueChange={(value) => setFormData({ ...formData, roomCategory: value })}
@@ -238,7 +246,7 @@ const AddRoom = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="roomNumber">Room Number</Label>
+                <Label htmlFor="roomNumber">Room Number *</Label>
                 <Input
                   id="roomNumber"
                   placeholder="e.g. A1"
@@ -249,7 +257,7 @@ const AddRoom = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ratePerDay">Rate Per Day (₹)</Label>
+                <Label htmlFor="ratePerDay">Rate Per Day (₹) *</Label>
                 <Input
                   id="ratePerDay"
                   type="number"
@@ -262,7 +270,7 @@ const AddRoom = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amenities">Amenities</Label>
+              <Label htmlFor="amenities">Amenities (Optional)</Label>
               <Textarea
                 id="amenities"
                 placeholder="AC, TV, Refrigerator"
@@ -272,7 +280,7 @@ const AddRoom = () => {
               <p className="text-xs text-muted-foreground">Separate items with commas</p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || floors.length === 0 || departments.length === 0}>
+            <Button type="submit" className="w-full" disabled={loading || isFormIncomplete}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? "Adding..." : "Add Room"}
             </Button>
