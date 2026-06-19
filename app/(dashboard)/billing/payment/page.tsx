@@ -33,6 +33,7 @@ interface PaymentForm {
 export default function PaymentPage() {
   const nameRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
+  const billIdRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<PaymentForm>({
     bill_id: '',
@@ -48,77 +49,139 @@ export default function PaymentPage() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchingBill, setFetchingBill] = useState(false);
 
   // Suggestion States
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [fetchedBillIds, setFetchedBillIds] = useState<string[]>([]);
+  
   const [showNameDropdown, setShowNameDropdown] = useState(false);
   const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
+  const [showBillDropdown, setShowBillDropdown] = useState(false);
 
   /* ---------------- CLICK OUTSIDE LOGIC ---------------- */
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowNameDropdown(false);
       if (phoneRef.current && !phoneRef.current.contains(e.target as Node)) setShowPhoneDropdown(false);
+      if (billIdRef.current && !billIdRef.current.contains(e.target as Node)) setShowBillDropdown(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   /* ---------------- DEBOUNCED FETCH LOGIC ---------------- */
-  // Unified debounce for both name and phone search using the Admission API
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchName.length >= 3) fetchAdmissionSuggestions(searchName, 0); // type 0 for general search
+      if (searchName.length >= 3) fetchAdmissionSuggestions(searchName, 'name');
     }, 500);
     return () => clearTimeout(timer);
   }, [searchName]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchPhone.length >= 3) fetchAdmissionSuggestions(searchPhone, 0); 
+      if (searchPhone.length >= 3) fetchAdmissionSuggestions(searchPhone, 'phone'); 
     }, 500);
     return () => clearTimeout(timer);
   }, [searchPhone]);
 
-  const fetchAdmissionSuggestions = async (query: string, type: number) => {
+  const fetchAdmissionSuggestions = async (query: string, searchMode: 'name' | 'phone') => {
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`, 
-        { 
-          search: query, 
-          type: type, 
-          hospital_id: CLINIC_ID 
-        }, 
+      const payload: any = {};
+      if (searchMode === 'name') {
+        payload.patient_name = query;
+      } else {
+        payload.phone_number = query;
+      }
+
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/patientAdmission/get_admitted_patient_profile_suggestion`, 
+        payload, 
         { withCredentials: true }
       );
       
+      console.log("Suggestions API response data log:", res.data);
+
       if (res.data.resSuccess === 1) {
-        setSuggestions(res.data.data);
-        // Determine which dropdown to show based on what user is typing
-        if (searchName.length >= 3 && document.activeElement === nameRef.current?.querySelector('input')) {
+        setSuggestions(res.data.data || []);
+        if (searchMode === 'name' && document.activeElement === nameRef.current?.querySelector('input')) {
           setShowNameDropdown(true);
         }
-        if (searchPhone.length >= 3 && document.activeElement === phoneRef.current?.querySelector('input')) {
+        if (searchMode === 'phone' && document.activeElement === phoneRef.current?.querySelector('input')) {
           setShowPhoneDropdown(true);
         }
       }
-    } catch (err) { console.error("Fetch suggestions error", err); }
+    } catch (err) { 
+      console.error("Fetch suggestions failure connection exception:", err); 
+    }
+  };
+
+  /* ---------------- CASCADING BILL RETRIEVAL LOGIC ---------------- */
+  const fetchPatientBillDetails = async (admissionTrackingId: string) => {
+    try {
+      setFetchingBill(true);
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/billing/get_bill`,
+        { admission_id: admissionTrackingId },
+        { withCredentials: true }
+      );
+
+      console.log("Billing Lookup API response data log:", res.data);
+
+      if (res.data.resSuccess === 1 && Array.isArray(res.data.data)) {
+        // Extract unique bill_ids from the array of line items
+        const uniqueBillIds: string[] = Array.from(
+          new Set(res.data.data.map((item: any) => item.bill_id).filter(Boolean))
+        );
+
+        setFetchedBillIds(uniqueBillIds);
+
+        if (uniqueBillIds.length > 0) {
+          // Prefill with the first bill_id found as a default choice
+          setFormData(prev => ({ ...prev, bill_id: uniqueBillIds[0] }));
+          
+          toast({
+            title: "Bills Discovered",
+            description: `Found ${uniqueBillIds.length} active bill reference(s) for this admission.`
+          });
+        } else {
+          setFormData(prev => ({ ...prev, bill_id: "" }));
+          toast({
+            title: "No Bills Found",
+            description: "This admission has no pending or billed line items.",
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error retrieving active bill context summary mapping:", err);
+    } finally {
+      setFetchingBill(false);
+    }
   };
 
   /* ---------------- SELECTION LOGIC ---------------- */
   const handleSelectPatient = (p: any) => {
-    setSearchName(p.patient_name);
-    setSearchPhone(p.phone_number);
+    console.log("Selected target patient record log entity:", p);
+    
+    setSearchName(p.patient_name || "");
+    setSearchPhone(p.phone_number || "");
     setShowNameDropdown(false);
     setShowPhoneDropdown(false);
     
-    // Auto-fill IDs from the admission suggestion response
+    // Auto-fill form fields using the internal response '_id' as 'admission_id'
     setFormData(prev => ({ 
       ...prev, 
-      patient_id: p.patient_id, 
-      admission_id: p._id // Based on your handler, _id is the internal Admission document ID
+      patient_id: p.patient_id || "", 
+      admission_id: p._id || "" 
     }));
+
+    // Trigger secondary cascading ledger bills retrieval using internal _id
+    if (p._id) {
+      fetchPatientBillDetails(p._id);
+    }
   };
 
   const handleChange = (field: keyof PaymentForm, value: string | number) => {
@@ -129,7 +192,7 @@ export default function PaymentPage() {
     e.preventDefault();
 
     if (!formData.bill_id && !formData.final_bill_id) {
-      toast({ title: "Invalid payment", description: "Enter a Bill ID or Final Bill ID.", variant: "destructive" });
+      toast({ title: "Invalid payment", description: "Enter or select a Bill ID or Final Bill ID.", variant: "destructive" });
       return;
     }
     if (formData.amount_paid <= 0) {
@@ -142,20 +205,27 @@ export default function PaymentPage() {
     }
 
     setIsLoading(true);
+    
+    const submissionPayload = {
+      bill_id: formData.bill_id || undefined,
+      final_bill_id: formData.final_bill_id || undefined,
+      admission_id: formData.admission_id || undefined,
+      patient_id: formData.patient_id || undefined,
+      amount_paid: formData.amount_paid,
+      payment_method: formData.payment_method,
+      transaction_id: formData.reference_id || undefined,
+      received_by: formData.created_by || undefined,
+      date: new Date().toISOString().slice(0, 10),
+      notes: formData.payment_notes || undefined,
+      payment_type: formData.payment_type || undefined,
+    };
+
+    console.log("Submitting transaction runtime payment line parameter payload:", submissionPayload);
+
     try {
-      const response = await billingPost("add_payment", {
-        bill_id: formData.bill_id || undefined,
-        final_bill_id: formData.final_bill_id || undefined,
-        admission_id: formData.admission_id || undefined,
-        patient_id: formData.patient_id || undefined,
-        amount_paid: formData.amount_paid,
-        payment_method: formData.payment_method,
-        transaction_id: formData.reference_id || undefined,
-        received_by: formData.created_by || undefined,
-        date: new Date().toISOString().slice(0, 10),
-        notes: formData.payment_notes || undefined,
-        payment_type: formData.payment_type || undefined,
-      });
+      const response = await billingPost("add_payment", submissionPayload);
+
+      console.log("Transaction Recording submission response data log:", response);
 
       if (response.apiSuccess === 1) {
         toast({ title: "Success", description: response.message || "Payment recorded successfully." });
@@ -164,7 +234,9 @@ export default function PaymentPage() {
           amount_paid: 0, payment_method: '', reference_id: '',
           payment_notes: '', payment_type: '', created_by: 'RECEPTIONIST_001',
         });
-        setSearchName(""); setSearchPhone("");
+        setSearchName(""); 
+        setSearchPhone("");
+        setFetchedBillIds([]);
       } else {
         toast({
           title: response.apiSuccess === -1 ? "Server error" : "Invalid payment",
@@ -173,13 +245,24 @@ export default function PaymentPage() {
         });
       }
     } catch (error) {
+      console.error("Payment registration submission exception error:", error);
       toast({ title: "Error", description: "Server Error", variant: "destructive" });
-    } finally { setIsLoading(false); }
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Payment Processing</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Payment Processing</h1>
+        {fetchingBill && (
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground animate-pulse">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            Syncing statement balances...
+          </div>
+        )}
+      </div>
 
       <Card className="overflow-visible">
         <CardHeader>
@@ -199,11 +282,11 @@ export default function PaymentPage() {
                   onChange={(e) => setSearchName(e.target.value)} 
                 />
                 {showNameDropdown && suggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-xl max-h-48 overflow-auto">
+                  <div className="absolute top-[calc(100%+4px)] z-50 w-full bg-white border rounded-md shadow-xl max-h-48 overflow-y-auto">
                     {suggestions.map((p) => (
-                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0" onClick={() => handleSelectPatient(p)}>
-                        <div className="font-bold text-sm">{p.patient_name}</div>
-                        <div className="text-[10px] text-muted-foreground">ID: {p.admission_id} | {p.phone_number}</div>
+                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0 flex flex-col gap-0.5" onClick={() => handleSelectPatient(p)}>
+                        <div className="font-bold text-sm text-slate-900">{p.patient_name}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">Internal ID: {p._id} | {p.phone_number}</div>
                       </div>
                     ))}
                   </div>
@@ -219,11 +302,11 @@ export default function PaymentPage() {
                   onChange={(e) => setSearchPhone(e.target.value)} 
                 />
                 {showPhoneDropdown && suggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-xl max-h-48 overflow-auto">
+                  <div className="absolute top-[calc(100%+4px)] z-50 w-full bg-white border rounded-md shadow-xl max-h-48 overflow-y-auto">
                     {suggestions.map((p) => (
-                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0" onClick={() => handleSelectPatient(p)}>
-                        <div className="font-bold text-sm">{p.phone_number}</div>
-                        <div className="text-[10px] text-muted-foreground">{p.patient_name}</div>
+                      <div key={p._id} className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0 flex flex-col gap-0.5" onClick={() => handleSelectPatient(p)}>
+                        <div className="font-bold text-sm text-slate-900">{p.phone_number}</div>
+                        <div className="text-[10px] text-muted-foreground">{p.patient_name} (Internal ID: {p._id})</div>
                       </div>
                     ))}
                   </div>
@@ -232,17 +315,39 @@ export default function PaymentPage() {
 
               <div className="space-y-2">
                 <Label>Patient ID</Label>
-                <Input value={formData.patient_id} onChange={(e) => handleChange('patient_id', e.target.value)} placeholder="Auto-filled" required />
+                <Input value={formData.patient_id} readOnly className="bg-slate-50 font-mono text-xs cursor-not-allowed" placeholder="Auto-filled via search" required />
               </div>
 
               <div className="space-y-2">
                 <Label>Admission ID</Label>
-                <Input value={formData.admission_id} onChange={(e) => handleChange('admission_id', e.target.value)} placeholder="Auto-filled" required />
+                <Input value={formData.admission_id} readOnly className="bg-slate-50 font-mono text-xs cursor-not-allowed" placeholder="Auto-filled via search" required />
               </div>
 
-              <div className="space-y-2">
+              {/* Bill ID Field with dropdown suggestions from get_bill response array */}
+              <div className="space-y-2 relative" ref={billIdRef}>
                 <Label>Bill ID</Label>
-                <Input value={formData.bill_id} onChange={(e) => handleChange('bill_id', e.target.value)} placeholder="Enter Bill ID" />
+                <Input 
+                  value={formData.bill_id} 
+                  onChange={(e) => handleChange('bill_id', e.target.value)} 
+                  onFocus={() => setShowBillDropdown(true)}
+                  placeholder="Enter or choose discovered Bill ID" 
+                />
+                {showBillDropdown && fetchedBillIds.length > 0 && (
+                  <div className="absolute top-[calc(100%+4px)] z-50 w-full bg-white border rounded-md shadow-lg max-h-36 overflow-y-auto">
+                    {fetchedBillIds.map((id) => (
+                      <div 
+                        key={id} 
+                        className="p-2.5 hover:bg-slate-50 cursor-pointer text-xs font-mono font-medium text-slate-800 border-b last:border-0"
+                        onClick={() => {
+                          handleChange('bill_id', id);
+                          setShowBillDropdown(false);
+                        }}
+                      >
+                        {id}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -290,7 +395,7 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full h-12">
+            <Button type="submit" disabled={isLoading || fetchingBill} className="w-full h-12">
               {isLoading ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : "Record Payment"}
             </Button>
           </form>
